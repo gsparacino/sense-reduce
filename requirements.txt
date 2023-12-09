@@ -1,4 +1,4 @@
-tensorflow==2.11.*
+tensorflow==2.12.*
 numpy==1.23.*
 pandas==1.5.*
 numexpr==2.8.* # pandas performance optimization

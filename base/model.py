@@ -89,7 +89,7 @@ class Model(PredictionModel):
         os.makedirs(model_dir, exist_ok=True)
         with open(os.path.join(model_dir, LiteModel.FILE_NAME), 'wb') as f:
             f.write(self._to_tflite_model())
-continual_strategy
+
     def save_and_convert(self, model_dir='.') -> None:
         """Saves the model in SavedModel format and as a TFLite model."""
         self.save(model_dir)

@@ -1,3 +1,4 @@
 .idea
+base/__pycache__
 simulation/zamg/models
-simulation/zamg/data/*.csv
+simulation/zamg/data/**/*.csv

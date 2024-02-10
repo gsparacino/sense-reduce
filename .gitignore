@@ -2,3 +2,4 @@
 base/__pycache__
 simulation/zamg/models
 simulation/zamg/data/**/*.csv
+.venv

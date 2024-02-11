@@ -29,7 +29,7 @@ base_model = Model(tf.keras.models.load_model(os.path.join(app.config['MODEL_DIR
 # TODO: make the strategies configurable
 cl_strategy = NoUpdateStrategy()
 cl_strategy.add_model(base_model)
-node_manager = NodeManager(base_model, NoUpdateStrategy(), DeployOnceStrategy(), app.config['MODEL_DIR'])
+node_manager = NodeManager(cl_strategy, DeployOnceStrategy(), app.config['MODEL_DIR'])
 logging.info(f'Loaded initial model with ID={base_model_id} and started node manager')
 
 

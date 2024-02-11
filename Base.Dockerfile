@@ -23,6 +23,8 @@ RUN pip install -e .
 
 FROM python:3.11-slim-bookworm as runner
 
+EXPOSE 5000
+
 ARG APP_FOLDER="/usr/local/app"
 
 RUN mkdir $APP_FOLDER
@@ -31,10 +33,20 @@ WORKDIR $APP_FOLDER
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder $APP_FOLDER $APP_FOLDER
 
+# Training dataset
+RUN mkdir data
+ADD /simulation/zamg/zamg_vienna_hourly.pickle data/training.pickle
+
+# Base model
+RUN mkdir models
+ADD /simulation/zamg/models/zamg_vienna_2019_2019_simple_dense models/base-model/
+ADD /simulation/zamg/models/zamg_vienna_2019_2019_simple_dense/metadata.json models/base-model.json
+
 RUN useradd --create-home --shell /bin/bash app
 RUN chown app:app $APP_FOLDER
 USER app
 
 ENV PATH="/opt/venv/bin:$PATH"
 
-ENTRYPOINT ["python", "base/app.py"]
+# Starts the app in debug mode (not ideal, prone to RCE attacks)
+ENTRYPOINT ["flask", "--app", "base/app", "run", "--host", "0.0.0.0"]

@@ -39,8 +39,10 @@ ADD /simulation/zamg/zamg_vienna_hourly.pickle data/training.pickle
 
 # Base model
 RUN mkdir models
-ADD /simulation/zamg/models/zamg_vienna_2019_2019_simple_dense models/base-model/
+ADD /simulation/zamg/models/zamg_vienna_2019_2019_simple_dense models/base-model/ 
 ADD /simulation/zamg/models/zamg_vienna_2019_2019_simple_dense/metadata.json models/base-model.json
+
+RUN apt-get update && apt-get install -y curl
 
 RUN useradd --create-home --shell /bin/bash app
 RUN chown app:app $APP_FOLDER

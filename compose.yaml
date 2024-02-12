@@ -1,12 +1,19 @@
 services:
   base:
-    build: 
+    build:
       dockerfile: Base.Dockerfile
+    healthcheck:
+        test: curl -f http://localhost:5000/nodes || exit 1
+        interval: 30s
+        timeout: 10s
+        retries: 5
+    restart: unless-stopped
     ports:
       - "5000:5000"
   sensor1:
     build:
       dockerfile: Sensor.Dockerfile
-    command: mock http://base:5000 --mode predict --interval 10 --threshold 2 --id S1
+    command: mock http://base:5000 --mode none --interval 10 --threshold 2 --id S1
     depends_on:
-    - base
+      base:
+        condition: service_healthy

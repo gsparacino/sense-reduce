@@ -38,11 +38,12 @@ def register_node(node_id: str):
     """Registers a new node and returns the model metadata and initial data for the node."""
     body: dict = request.get_json(force=True)
     threshold_metric = ThresholdMetric.from_dict(body['threshold_metric'])
-    initial_df = pd.read_json(body.get('initial_df'))
+    if body.get('initial_df') is None:
+        initial_df = training_df
+    else:
+        initial_df = pd.read_json(body.get('initial_df'))
     logging.info(f'New node with ID={node_id}, threshold={threshold_metric}, and initial_df={initial_df} registered')
 
-    if initial_df is None:
-        initial_df = training_df
     # TODO: test
     node = node_manager.add_node(node_id, threshold_metric, initial_df, datetime.now())
     payload = dict()

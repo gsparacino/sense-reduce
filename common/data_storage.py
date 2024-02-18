@@ -49,7 +49,10 @@ class DataStorage:
         while i <= end:
             j = i - datetime.timedelta(days=365)  # this way we don't have to consider Feb 29 separately
             previous_values = pd.DataFrame(columns=previous.columns)
-            value = previous.loc[j]
+            try:
+                value = previous.loc[j]
+            except KeyError:
+                value = None
             while value is not None:
                 previous_values.loc[j] = value
                 j -= datetime.timedelta(days=365)
@@ -60,6 +63,20 @@ class DataStorage:
             data.add_measurement(i, previous_values.mean())
             i += datetime.timedelta(hours=1)
         return data
+
+    @classmethod
+    def from_previous_average(cls,
+                              days: int,
+                              previous: pd.DataFrame,
+                              output_features: List[str]) -> 'DataStorage':
+        """Creates StorageData with measurements from the latest available data"""
+        start: datetime.datetime = previous.index.min()
+        end: datetime.datetime = previous.index.max()
+
+        if (end - start).days > days:
+            start = end - datetime.timedelta(days=days)
+
+        return cls.from_previous_years_average(start, end, previous, output_features)
 
     @classmethod
     def csv_path_measurements(cls, prefix='') -> str:

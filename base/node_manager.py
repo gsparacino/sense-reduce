@@ -8,8 +8,8 @@ from typing import Dict, Optional, List
 import numpy as np
 import pandas as pd
 
-from base.learning_strategy import LearningStrategy
 from base.deployment_strategy import DeploymentStrategy
+from base.learning_strategy import LearningStrategy
 from base.model import Model
 from base.node import Node, NodeID
 from common import Predictor, DataStorage, ModelMetadata, LiteModel, ThresholdMetric
@@ -104,9 +104,8 @@ class NodeManager:
 
         if start_dt > initial_df.index[-1] + timedelta(hours=1):
             logging.info(f'Generating initial data for node {node_id} to match start datetime {start_dt}')
-            initial_data = DataStorage.from_previous_years_average(
-                start_dt - timedelta(hours=model.metadata.input_length),
-                start_dt,
+            initial_data = DataStorage.from_previous_average(
+                30,
                 initial_df,
                 model.metadata.output_features,
             )

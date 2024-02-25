@@ -330,19 +330,19 @@ if __name__ == '__main__':
     ARGS = parser.parse_args()
 
     if ARGS.sensor == 'ds18b20':
-        from sensor.temperature_sensor_ds18b20 import DS18B20Sensor
+        from temperature_sensor_ds18b20 import DS18B20Sensor
 
         sensor = DS18B20Sensor()
     elif ARGS.sensor == 'sense-hat':
-        from sensor.temperature_sensor_sense_hat import HatSensor
+        from temperature_sensor_sense_hat import HatSensor
 
         sensor = HatSensor()
     elif ARGS.sensor == 'dht22':
-        from sensor.temperature_sensor_dht22 import DHT22Sensor
+        from temperature_sensor_dht22 import DHT22Sensor
 
         sensor = DHT22Sensor()
     elif ARGS.sensor == 'mock':
-        from sensor.temperature_sensor_mock import MockSensor
+        from temperature_sensor_mock import MockSensor
 
         sensor = MockSensor()
     else:

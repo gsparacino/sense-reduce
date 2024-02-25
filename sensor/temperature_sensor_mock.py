@@ -13,7 +13,9 @@ class MockSensor(AbstractSensor):
 
     @property
     def measurement(self) -> pd.Series:
-        return pd.Series(data=[self.temperature], index=['TMP'])
+        # TODO return values of other features as well
+        return pd.Series(data=[0, 0, 0, 0, 0, 0, self.temperature, 0, 0, 0],
+                         index=["DD", "FFAM", "P", "RF", "RR", "SO", "TL", "DD_sin", "DD_cos", "RR_norm"])
 
     @property
     def temperature(self) -> float:

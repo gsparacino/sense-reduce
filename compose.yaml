@@ -3,14 +3,14 @@ services:
     build:
       dockerfile: Base.Dockerfile
     healthcheck:
-        test: curl -f http://localhost:5000/nodes || exit 1
-        interval: 10s
-        timeout: 10s
-        retries: 5
+      test: curl -f http://localhost:5000/nodes || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 5
     restart: unless-stopped
     ports:
       - "5000:5000"
-  sensor1:
+  sensor:
     build:
       dockerfile: Sensor.Dockerfile
     command: mock http://base:5000 --mode none --interval 10 --threshold 2 --id S1

@@ -11,6 +11,11 @@ import requests
 
 from common import Predictor, LiteModel, DataStorage, ThresholdMetric, ModelMetadata, L2Threshold
 from predicting_monitor import PredictingMonitor
+from sensor.abstract_sensor import AbstractSensor
+from sensor.temperature_sensor_dht22 import DHT22Sensor
+from sensor.temperature_sensor_ds18b20 import DS18B20Sensor
+from sensor.temperature_sensor_mock import MockSensor
+from sensor.temperature_sensor_sense_hat import HatSensor
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -20,6 +25,7 @@ def run(threshold_metric: ThresholdMetric,
         data_reduction_mode: str,
         wifi_toggle: bool,
         check_interval: float,
+        sensor: AbstractSensor
         ) -> None:
     """Starts a sensor node in SenseReduce, which connects to a base station and starts monitoring.
 
@@ -29,6 +35,7 @@ def run(threshold_metric: ThresholdMetric,
         data_reduction_mode (str): The data reduction mode applied, either "none" or "predict".
         wifi_toggle (bool): A flag indicating whether Wi-Fi should be turned off between transmissions.
         check_interval (float): The regular interval in seconds for checking the sensor's readings.
+        sensor (AbstractSensor): The implementation of AbstractSensor from which measurements are collected
 
     Returns:
         None
@@ -40,7 +47,6 @@ def run(threshold_metric: ThresholdMetric,
     logging.info(f'Starting sensor node with ID={NODE_ID} in "{data_reduction_mode}" mode, '
                  f'threshold={threshold_metric} and base={base_address}...'
                  )
-    sensor = TemperatureSensor()
 
     if data_reduction_mode == 'none':
         register_node(base_address, threshold_metric)
@@ -320,20 +326,25 @@ if __name__ == '__main__':
                         help='The unique ID of the node. If multiple nodes have the same ID, behavior is undefined.'
                              'If not provided, a UUID is generated with uuid.uuid1().'
                         )
+    parser.add_argument('--data', type=str, default=uuid.uuid1(),
+                        help='The path of a .csv file containing pre-defined data to be returned by the mock sensor.'
+                             'This argument is ignored if the value of the "sensor" argument is not equal to "mock".'
+                             'If not provided, the mock sensor will generate random data.'
+                        )
     ARGS = parser.parse_args()
 
     if ARGS.sensor == 'ds18b20':
-        from temperature_sensor_ds18b20 import TemperatureSensor
+        sensor = DS18B20Sensor()
     elif ARGS.sensor == 'sense-hat':
-        from temperature_sensor_sense_hat import TemperatureSensor
+        sensor = HatSensor()
     elif ARGS.sensor == 'dht22':
-        from temperature_sensor_dht22 import TemperatureSensor
+        sensor = DHT22Sensor()
     elif ARGS.sensor == 'mock':
-        from temperature_sensor_mock import TemperatureSensor
+        sensor = MockSensor()
     else:
         logging.error(f'Unsupported sensor type: {ARGS.sensor}. Aborting...')
         exit(1)
 
     NODE_ID = ARGS.id
     THRESHOLD = L2Threshold(ARGS.threshold, [0], [0])
-    run(THRESHOLD, ARGS.base, ARGS.mode, ARGS.wifi, ARGS.interval)
+    run(THRESHOLD, ARGS.base, ARGS.mode, ARGS.wifi, ARGS.interval, sensor)

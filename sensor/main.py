@@ -12,10 +12,6 @@ import requests
 from common import Predictor, LiteModel, DataStorage, ThresholdMetric, ModelMetadata, L2Threshold
 from predicting_monitor import PredictingMonitor
 from sensor.abstract_sensor import AbstractSensor
-from sensor.temperature_sensor_dht22 import DHT22Sensor
-from sensor.temperature_sensor_ds18b20 import DS18B20Sensor
-from sensor.temperature_sensor_mock import MockSensor
-from sensor.temperature_sensor_sense_hat import HatSensor
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -334,12 +330,20 @@ if __name__ == '__main__':
     ARGS = parser.parse_args()
 
     if ARGS.sensor == 'ds18b20':
+        from sensor.temperature_sensor_ds18b20 import DS18B20Sensor
+
         sensor = DS18B20Sensor()
     elif ARGS.sensor == 'sense-hat':
+        from sensor.temperature_sensor_sense_hat import HatSensor
+
         sensor = HatSensor()
     elif ARGS.sensor == 'dht22':
+        from sensor.temperature_sensor_dht22 import DHT22Sensor
+
         sensor = DHT22Sensor()
     elif ARGS.sensor == 'mock':
+        from sensor.temperature_sensor_mock import MockSensor
+
         sensor = MockSensor()
     else:
         logging.error(f'Unsupported sensor type: {ARGS.sensor}. Aborting...')

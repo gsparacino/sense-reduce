@@ -1,5 +1,4 @@
 tensorflow # or tflite-runtime
-matplotlib
 numpy
 pandas
 requests

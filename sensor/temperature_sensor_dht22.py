@@ -8,7 +8,7 @@ import pandas as pd
 from abstract_sensor import AbstractSensor
 
 
-class TemperatureSensor(AbstractSensor):
+class DHT22Sensor(AbstractSensor):
     """Encapsulates the access to a temperature sensor."""
 
     def __init__(self) -> None:

@@ -7,7 +7,7 @@ import pandas as pd
 from abstract_sensor import AbstractSensor
 
 
-class TemperatureSensor(AbstractSensor):
+class DS18B20Sensor(AbstractSensor):
     """Encapsulates the access to a temperature sensor."""
 
     path = '/sys/bus/w1/devices/28-3c01e076eb54/w1_slave'

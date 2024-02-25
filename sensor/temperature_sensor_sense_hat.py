@@ -7,7 +7,7 @@ from sense_hat import SenseHat
 from abstract_sensor import AbstractSensor
 
 
-class TemperatureSensor(AbstractSensor):
+class HatSensor(AbstractSensor):
     """Encapsulates the access to a temperature sensor."""
 
     def __init__(self) -> None:

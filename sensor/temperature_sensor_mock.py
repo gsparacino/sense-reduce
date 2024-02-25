@@ -5,7 +5,7 @@ import pandas as pd
 from abstract_sensor import AbstractSensor
 
 
-class TemperatureSensor(AbstractSensor):
+class MockSensor(AbstractSensor):
     """Mocks a temperature sensor with random data."""
 
     def __init__(self) -> None:

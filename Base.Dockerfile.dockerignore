@@ -5,8 +5,8 @@
 !./base
 !./common
 !./setup.py
-!./simulation/zamg/models/zamg_vienna_2019_2019_simple_dense
-!./simulation/zamg/zamg_vienna_hourly.pickle
+!./models
+!./data
 
 # Ignore unnecessary files inside allowed directories
 #**/.DS_Store

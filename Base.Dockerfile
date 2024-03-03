@@ -35,12 +35,12 @@ COPY --from=builder $APP_FOLDER $APP_FOLDER
 
 # Training dataset
 RUN mkdir data
-ADD /simulation/zamg/zamg_vienna_hourly.pickle data/training.pickle
+ADD /data/training.pickle data/training.pickle
 
 # Base model
 RUN mkdir models
-ADD /simulation/zamg/models/zamg_vienna_2019_2019_simple_dense models/base-model/ 
-ADD /simulation/zamg/models/zamg_vienna_2019_2019_simple_dense/metadata.json models/base-model.json
+ADD /models/base-model models/base-model/
+ADD /models/base-model.json models/base-model.json
 
 RUN apt-get update && apt-get install -y curl
 

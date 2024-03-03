@@ -45,7 +45,7 @@ ADD /models/base-model.json models/base-model.json
 RUN apt-get update && apt-get install -y curl
 
 RUN useradd --create-home --shell /bin/bash app
-RUN chown app:app $APP_FOLDER
+RUN chown -R app:app $APP_FOLDER
 USER app
 
 ENV PATH="/opt/venv/bin:$PATH"

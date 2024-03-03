@@ -1,3 +1,4 @@
+import argparse
 import datetime
 import functools
 import logging
@@ -297,7 +298,6 @@ def send_violation(dt: datetime.datetime,
 
 
 if __name__ == '__main__':
-    import argparse
 
     parser = argparse.ArgumentParser(description='Start a new sensor node.')
     parser.add_argument('sensor', type=str, choices=['ds18b20', 'sense-hat', 'dht22', 'mock'],
@@ -322,10 +322,10 @@ if __name__ == '__main__':
                         help='The unique ID of the node. If multiple nodes have the same ID, behavior is undefined.'
                              'If not provided, a UUID is generated with uuid.uuid1().'
                         )
-    parser.add_argument('--data', type=str, default=uuid.uuid1(),
+    parser.add_argument('--csv', type=str,
                         help='The path of a .csv file containing pre-defined data to be returned by the mock sensor.'
-                             'This argument is ignored if the value of the "sensor" argument is not equal to "mock".'
-                             'If not provided, the mock sensor will generate random data.'
+                             'If no csv file path is provided, the mock sensor will generate random data.'
+                             'This argument is ignored if the value of the "sensor" argument is not "mock".'
                         )
     ARGS = parser.parse_args()
 
@@ -344,7 +344,12 @@ if __name__ == '__main__':
     elif ARGS.sensor == 'mock':
         from temperature_sensor_mock import MockSensor
 
-        sensor = MockSensor()
+        if ARGS.csv is not None:
+            df = pd.read_csv(os.path.join('.', 'data.csv'))
+            df.reset_index(inplace=True)
+            sensor = MockSensor(df)
+        else:
+            sensor = MockSensor()
     else:
         logging.error(f'Unsupported sensor type: {ARGS.sensor}. Aborting...')
         exit(1)

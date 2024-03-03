@@ -34,21 +34,26 @@ class PredictingMonitor:
                 measurement = self.sensor.measurement
 
             now = datetime.datetime.now()
+            logging.debug(f"Measurement @ {now}: {measurement.values}")
             p = self.predictor
             p.add_measurement(now, measurement.to_numpy())
 
             try:
                 prediction = p.get_prediction_at(now)
+                logging.debug(f"Prediction @ {now}: {prediction.values}")
             except ValueError:
+                logging.debug(f"get_prediction returned execption: {ValueError}")
                 # TODO: keep track of last synchronization and only send required data
                 new_data = p.get_measurements_in_current_prediction_horizon(now)
                 p.update_prediction_horizon(now)
                 update_callback(now, new_data)
                 prediction = p.get_prediction_at(now)
+                logging.debug(f"Prediction @ {now}: {prediction.values}")
 
             p.add_prediction(now, prediction.to_numpy())
 
             if threshold_metric.is_threshold_violation(measurement, prediction.to_numpy()):
+                logging.info(f"Threshold violation > Measurement={measurement.values}, Prediction={prediction.values}")
                 # TODO: keep track of last synchronization and only send required data
                 new_data = p.get_measurements_in_current_prediction_horizon(now)
                 violation_callback(now, measurement, new_data)

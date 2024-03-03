@@ -1,0 +1,11 @@
+# Ignore everything
+*
+
+# Allowed files and directories
+!./sensor
+!./common
+!./setup.py
+!./data
+
+# Ignore unnecessary files inside allowed directories
+#**/.DS_Store

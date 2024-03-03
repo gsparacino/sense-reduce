@@ -13,7 +13,7 @@ services:
   sensor:
     build:
       dockerfile: Sensor.Dockerfile
-    command: mock http://base:5000 --mode none --interval 10 --threshold 2 --id S1
+    command: mock http://base:5000 --mode none --interval 10 --threshold 2 --id S1 --csv data/data.csv
     depends_on:
       base:
         condition: service_healthy

@@ -345,7 +345,8 @@ if __name__ == '__main__':
         from temperature_sensor_mock import MockSensor
 
         if ARGS.csv is not None:
-            df = pd.read_csv(os.path.join('.', 'data.csv'))
+            logging.debug(f"Loading sensor mock data {ARGS.csv}")
+            df = pd.read_csv(ARGS.csv)
             df.reset_index(inplace=True)
             sensor = MockSensor(df)
         else:

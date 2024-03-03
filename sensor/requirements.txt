@@ -2,3 +2,5 @@ tensorflow # or tflite-runtime
 numpy
 pandas
 requests
+matplotlib
+seaborn

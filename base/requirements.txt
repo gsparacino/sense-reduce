@@ -1,5 +1,6 @@
 tensorflow # or tflite-runtime
 matplotlib
+seaborn
 numpy
 pandas
 requests

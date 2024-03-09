@@ -342,15 +342,14 @@ if __name__ == '__main__':
 
         sensor = DHT22Sensor()
     elif ARGS.sensor == 'mock':
-        from temperature_sensor_mock import MockSensor
-
         if ARGS.csv is not None:
-            logging.debug(f"Loading sensor mock data {ARGS.csv}")
-            df = pd.read_csv(ARGS.csv)
-            df.reset_index(inplace=True)
-            sensor = MockSensor(df)
+            from temperature_sensor_mock_csv import CsvMockSensor
+
+            sensor = CsvMockSensor(ARGS.csv)
         else:
-            sensor = MockSensor()
+            from temperature_sensor_mock_random import RandomMockSensor
+
+            sensor = RandomMockSensor()
     else:
         logging.error(f'Unsupported sensor type: {ARGS.sensor}. Aborting...')
         exit(1)

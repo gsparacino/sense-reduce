@@ -33,16 +33,14 @@ WORKDIR $APP_FOLDER
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder $APP_FOLDER $APP_FOLDER
 
+RUN apt-get update && apt-get install -y curl
+
 # Training dataset
 RUN mkdir data
 ADD /data/training.pickle data/training.pickle
 
-# Base model
-RUN mkdir models
-ADD /models/base-model models/base-model/
-ADD /models/base-model.json models/base-model.json
-
-RUN apt-get update && apt-get install -y curl
+# Models folder
+RUN mkdir base/models
 
 RUN useradd --create-home --shell /bin/bash app
 RUN chown -R app:app $APP_FOLDER

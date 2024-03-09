@@ -10,10 +10,14 @@ services:
     restart: unless-stopped
     ports:
       - "5000:5000"
+    volumes:
+      - ./models:/usr/local/app/base/models # BS models dir
   sensor:
     build:
       dockerfile: Sensor.Dockerfile
-    command: mock http://base:5000 --mode none --interval 10 --threshold 2 --id S1 --csv data/data.csv
+    command: mock http://base:5000 --mode predict --interval 10 --threshold 0.1 --id S1 --csv data/data.csv
     depends_on:
       base:
         condition: service_healthy
+    volumes:
+      - ./data/mock:/usr/local/app/data # SN data dir (with mock data)

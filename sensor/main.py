@@ -22,7 +22,8 @@ def run(threshold_metric: ThresholdMetric,
         data_reduction_mode: str,
         wifi_toggle: bool,
         check_interval: float,
-        sensor: AbstractSensor
+        sensor: AbstractSensor,
+        prediction_period_s: int
         ) -> None:
     """Starts a sensor node in SenseReduce, which connects to a base station and starts monitoring.
 
@@ -33,6 +34,7 @@ def run(threshold_metric: ThresholdMetric,
         wifi_toggle (bool): A flag indicating whether Wi-Fi should be turned off between transmissions.
         check_interval (float): The regular interval in seconds for checking the sensor's readings.
         sensor (AbstractSensor): The implementation of AbstractSensor from which measurements are collected
+        prediction_period_s (int): The interval in seconds between consecutive predictions in a Prediction Horizon
 
     Returns:
         None
@@ -46,15 +48,16 @@ def run(threshold_metric: ThresholdMetric,
                  )
 
     if data_reduction_mode == 'none':
-        register_node(base_address, threshold_metric)
+        register_node(base_address, threshold_metric, prediction_period_s)
         while True:
             current_time = datetime.datetime.now()
             send_measurement(current_time, sensor.measurement.values, base_address)
             time.sleep(check_interval)
 
     elif data_reduction_mode == 'predict':
-        model, data = fetch_model_and_data(base_address, threshold_metric)
-        predictor = Predictor(model, data)
+        # TODO extract register_node call from fetch_model_and_data, since it should be performed in any case
+        model, data = fetch_model_and_data(base_address, threshold_metric, prediction_period_s)
+        predictor = Predictor(model, data, prediction_period_s)
         predictor.update_prediction_horizon(datetime.datetime.now())
         monitor = PredictingMonitor(sensor, predictor)
 
@@ -78,12 +81,13 @@ def run(threshold_metric: ThresholdMetric,
         raise ValueError(f'Unsupported data reduction mode: {data_reduction_mode}')
 
 
-def register_node(base_address: str, threshold_metric: ThresholdMetric) -> requests.Response:
+def register_node(base_address: str, threshold_metric: ThresholdMetric, prediction_period_s: int) -> requests.Response:
     """Registers the sensor node with the base station by providing its ID and threshold metric.
 
     Args:
         base_address: The address of the base station, e.g., "192.168.0.1:100".
         threshold_metric: The metric used to determine if a threshold has been reached.
+        prediction_period_s: The interval in seconds between consecutive predictions in a Prediction Horizon
 
     Returns:
         requests.Response: The response from the base station containing metadata and initial data in the body.
@@ -91,7 +95,10 @@ def register_node(base_address: str, threshold_metric: ThresholdMetric) -> reque
     Raises:
         requests.exceptions.RequestException: If an error occurs while sending the request.
     """
-    body = {'threshold_metric': threshold_metric.to_dict()}
+    body = {
+        'threshold_metric': threshold_metric.to_dict(),
+        'prediction_period_s': prediction_period_s
+    }
     logging.debug(f'Registering node {NODE_ID} with base station at {base_address}: {body}')
     try:
         response = requests.post(f'{base_address}/register/{NODE_ID}', json=body)
@@ -102,12 +109,14 @@ def register_node(base_address: str, threshold_metric: ThresholdMetric) -> reque
         raise
 
 
-def fetch_model_and_data(base_address: str, threshold_metric: ThresholdMetric) -> (LiteModel, DataStorage):
+def fetch_model_and_data(base_address: str, threshold_metric: ThresholdMetric, prediction_period_s: int) -> (
+        LiteModel, DataStorage):
     """Fetches the prediction model and initial data from the base station.
 
     Args:
         base_address: The address of the base station, e.g., "192.168.0.1:100".
         threshold_metric: The metric used to determine if a threshold has been reached.
+        prediction_period_s: The interval in seconds between consecutive predictions in a Prediction Horizon
 
     Returns:
         A tuple with the prediction model loaded from a TensorFlow Lite file and the initial data used to train it.
@@ -116,8 +125,9 @@ def fetch_model_and_data(base_address: str, threshold_metric: ThresholdMetric) -
         requests.exceptions.RequestException: If an error occurs while sending the request or loading the model.
     """
     try:
+        # TODO extract node registration
         # Register the node to receive model metadata and initial data
-        response = register_node(base_address, threshold_metric)
+        response = register_node(base_address, threshold_metric, prediction_period_s)
         body = response.json()
 
         # Download the model file from the base station and load it into a LiteModel object
@@ -327,6 +337,10 @@ if __name__ == '__main__':
                              'If no csv file path is provided, the mock sensor will generate random data.'
                              'This argument is ignored if the value of the "sensor" argument is not "mock".'
                         )
+    parser.add_argument('--prediction_period_s', type=int, default=60,
+                        help='The time delta (in seconds) between consecutive points in a Prediction Horizon.'
+                             'Defaults to 60 seconds.'
+                        )
     ARGS = parser.parse_args()
 
     if ARGS.sensor == 'ds18b20':
@@ -356,4 +370,4 @@ if __name__ == '__main__':
 
     NODE_ID = ARGS.id
     THRESHOLD = L2Threshold(ARGS.threshold, [0], [0])
-    run(THRESHOLD, ARGS.base, ARGS.mode, ARGS.wifi, ARGS.interval, sensor)
+    run(THRESHOLD, ARGS.base, ARGS.mode, ARGS.wifi, ARGS.interval, sensor, ARGS.prediction_period_s)

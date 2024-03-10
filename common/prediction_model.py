@@ -1,3 +1,4 @@
+import datetime
 from abc import ABC, abstractmethod
 
 import pandas as pd
@@ -14,5 +15,5 @@ class PredictionModel(ABC):
         pass
 
     @abstractmethod
-    def predict(self, input_df: pd.DataFrame) -> pd.DataFrame:
+    def predict(self, input_df: pd.DataFrame, timedelta: datetime.timedelta) -> pd.DataFrame:
         pass

@@ -26,17 +26,11 @@ class CsvMockSensor(AbstractSensor):
     @property
     def measurement(self) -> pd.Series:
         # TODO support multivariate measurements
-        if self.data is None:
-            return pd.Series(
-                data=[self.temperature],
-                index=self.features
-            )
-        else:
-            try:
-                return self.nextItem()
-            except StopIteration:
-                self.iterator = self.data.iterrows()
-                return self.nextItem()
+        try:
+            return self.nextItem()
+        except StopIteration:
+            self.iterator = self.data.iterrows()
+            return self.nextItem()
 
     def nextItem(self):
         return next(self.iterator)[1][self.features]

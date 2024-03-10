@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 import numpy as np
@@ -47,10 +47,11 @@ class PredictionHorizon:
 class Predictor:
     """Uses a PredictionModel to provide predictions for arbitrary timestamps in the prediction range of the model."""
 
-    def __init__(self, model: PredictionModel, data: DataStorage) -> None:
+    def __init__(self, model: PredictionModel, data: DataStorage, prediction_period_s: int) -> None:
         assert model.metadata.output_length <= 24  # self.get_prediction_at(dt) expects a horizon of less than a day
         self._model = model
         self._data = data
+        self._prediction_period_s = timedelta(seconds=prediction_period_s)
         self._prediction_horizon: Optional[PredictionHorizon] = None
 
     @property
@@ -134,7 +135,7 @@ class Predictor:
             return
 
         previous_m = self._data.get_measurements_previous_hours(start, self._model.metadata.input_length)
-        new_horizon = self._model.predict(previous_m)
+        new_horizon = self._model.predict(previous_m, self._prediction_period_s)
 
         # we also need the last measurement for interpolation
         last_ts = previous_m.index.max()

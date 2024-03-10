@@ -83,6 +83,7 @@ class NodeManager:
                  threshold_metric: ThresholdMetric,
                  initial_df: pd.DataFrame,
                  start_dt: datetime,
+                 prediction_period_s: int,
                  lite_model=True,
                  ) -> Node:
         """Creates a new node with the given id and threshold metric and adds it to the manager.
@@ -93,6 +94,7 @@ class NodeManager:
             initial_df: The initial data for the first predictions of the node.
             start_dt: When to start the first prediction horizon. If not within one hour after initial_df,
                 yearly-averaged data from initial_df is used.
+            prediction_period_s: The interval in seconds between consecutive predictions in a Prediction Horizon
             lite_model: Whether to use a TFlite model or a full model.
         """
         if node_id in self._node_ids_to_node:
@@ -118,7 +120,7 @@ class NodeManager:
             predictor_model = LiteModel.load(self.get_node_dir(node_id))
         else:
             predictor_model = model
-        predictor = Predictor(predictor_model, initial_data.copy())
+        predictor = Predictor(predictor_model, initial_data.copy(), prediction_period_s)
         predictor.update_prediction_horizon(start_dt)
         node = Node(node_id, threshold_metric, model, predictor)
         self._node_ids_to_node[node_id] = node

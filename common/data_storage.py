@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from .utils import full_hours_before, to_full_hour
+from .utils import to_full_hour, timestamps_before
 
 
 # TODO (long-term): this class should become a layer for accessing a time-series database (e.g., InfluxDB)
@@ -128,10 +128,16 @@ class DataStorage:
 
         If there are no measurements for a full hour, the values of the next one are used.
         """
-        hours = list(full_hours_before(dt, n_hours))  # will result in an already sorted list
-        idx = self._measurements.index.get_indexer(hours, method='nearest')
+        # hours = list(full_hours_before(dt, n_hours))  # will result in an already sorted list
+        # idx = self._measurements.index.get_indexer(hours, method='nearest')
+        # result: pd.DataFrame = self._measurements.iloc[idx].copy()
+        # result.set_index(pd.DatetimeIndex(hours), inplace=True)
+        timestamps = list(
+            timestamps_before(dt, n_hours, datetime.timedelta(seconds=1))
+        )
+        idx = self._measurements.index.get_indexer(timestamps, method='nearest')
         result: pd.DataFrame = self._measurements.iloc[idx].copy()
-        result.set_index(pd.DatetimeIndex(hours), inplace=True)
+        result.set_index(pd.DatetimeIndex(timestamps), inplace=True)
         return result
 
     def get_diff(self, columns: List[str] = None) -> pd.DataFrame:

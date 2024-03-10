@@ -1,6 +1,6 @@
+import datetime
 import logging
 import os
-from datetime import datetime
 from typing import Any, Union
 
 import numpy as np
@@ -95,11 +95,12 @@ class Model(PredictionModel):
         self.save(model_dir)
         self.save_lite(model_dir)
 
-    def predict(self, x: pd.DataFrame) -> pd.DataFrame:
+    def predict(self, x: pd.DataFrame, timedelta: datetime.timedelta) -> pd.DataFrame:
         """Runs a single inference of the model.
 
         Args:
             x: A pandas.DataFrame with DatetimeIndex
+            timedelta: the desired time gap between consecutive predictions
 
         Returns:
             A pandas DataFrame with DatetimeIndex
@@ -114,7 +115,7 @@ class Model(PredictionModel):
                                           / self.metadata.input_normalization_std
         return x
 
-    def _model_output_to_dataframe(self, a: np.ndarray, dt: datetime) -> pd.DataFrame:
+    def _model_output_to_dataframe(self, a: np.ndarray, dt: datetime.datetime) -> pd.DataFrame:
         a = (a * self.metadata.output_normalization_std) + self.metadata.output_normalization_mean
         return pd.DataFrame(data=a.reshape((self.metadata.output_length, self.metadata.output_attributes)),
                             columns=self.metadata.output_features,

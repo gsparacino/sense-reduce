@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 from typing import Union
@@ -8,7 +9,7 @@ import tensorflow as tf
 
 from .model_metadata import ModelMetadata
 from .prediction_model import PredictionModel
-from .utils import full_hours_after, convert_datetime
+from .utils import convert_datetime, timestamps_after
 
 
 class LiteModel(PredictionModel):
@@ -72,11 +73,12 @@ class LiteModel(PredictionModel):
             logging.warning(f'Interpreter output shape and metadata output shape do not match, '
                             f'{output_shape} != {self.metadata.output_shape}')
 
-    def predict(self, input_df: pd.DataFrame) -> pd.DataFrame:
+    def predict(self, input_df: pd.DataFrame, timedelta: datetime.timedelta) -> pd.DataFrame:
         """Runs a single inference on the interpreter.
 
         Args:
             input_df: a pandas DataFrame with DatetimeIndex
+            timedelta: the desired time gap between consecutive predictions
 
         Returns:
             A pandas DataFrame with DatetimeIndex
@@ -94,4 +96,4 @@ class LiteModel(PredictionModel):
         predictions = (predictions * self.metadata.output_normalization_std) + self.metadata.output_normalization_mean
         return pd.DataFrame(data=predictions.reshape((self.metadata.output_length, self.metadata.output_attributes)),
                             columns=self.metadata.output_features,
-                            index=full_hours_after(last_ts, self.metadata.output_length))
+                            index=timestamps_after(last_ts, self.metadata.output_length, timedelta))

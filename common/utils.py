@@ -18,15 +18,23 @@ def full_hours_before(dt: datetime.datetime, n_hours: int):
     """
     # dt -= datetime.timedelta(microseconds=1)  # would exclude dt
     last_hour = to_full_hour(dt)
-    for i in reversed(range(0, n_hours)):
-        yield last_hour - datetime.timedelta(hours=i)
+    return timestamps_before(last_hour, n_hours, datetime.timedelta(hours=1))
+
+
+def timestamps_before(dt: datetime, n_timestamps: int, timedelta: datetime.timedelta):
+    for i in reversed(range(0, n_timestamps)):
+        yield dt - (i * timedelta)
 
 
 def full_hours_after(dt: datetime.datetime, n_hours: int):
     """Yields datetime objects for the next n_hours full hours after dt (exclusive)."""
     last_hour = to_full_hour(dt)
-    for i in range(1, n_hours + 1):
-        yield last_hour + datetime.timedelta(hours=i)
+    return timestamps_after(last_hour, n_hours, datetime.timedelta(hours=1))
+
+
+def timestamps_after(dt: datetime, n_timestamps: int, timedelta: datetime.timedelta):
+    for i in range(0, n_timestamps):
+        yield dt + (i * timedelta)
 
 
 def timeseries_to_dict(series) -> dict:

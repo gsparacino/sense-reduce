@@ -40,7 +40,9 @@ RUN mkdir data
 ADD /data/training.pickle data/training.pickle
 
 # Models folder
-RUN mkdir base/models
+RUN mkdir models
+ADD /models/base-model models/base-model/
+ADD /models/base-model.json models/base-model.json
 
 RUN useradd --create-home --shell /bin/bash app
 RUN chown -R app:app $APP_FOLDER

@@ -31,6 +31,10 @@ WORKDIR $APP_FOLDER
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder $APP_FOLDER $APP_FOLDER
 
+# Sensor Mock data
+RUN mkdir data
+ADD ./data/mock/*.csv ./data/
+
 RUN useradd --create-home --shell /bin/bash app
 RUN chown app:app $APP_FOLDER
 USER app

@@ -10,8 +10,8 @@ services:
     restart: unless-stopped
     ports:
       - "5000:5000"
-    volumes:
-      - ./models:/usr/local/app/base/models # BS models dir
+  #    volumes:
+  #      - ./models:/usr/local/app/base/models # BS models dir
   sensor:
     build:
       dockerfile: Sensor.Dockerfile
@@ -19,5 +19,5 @@ services:
     depends_on:
       base:
         condition: service_healthy
-    volumes:
-      - ./data/mock:/usr/local/app/data # SN data dir (with mock data)
+#    volumes:
+#      - ./data/mock:/usr/local/app/data # SN data dir (with mock data)

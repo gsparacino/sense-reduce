@@ -3,7 +3,7 @@ services:
     build:
       dockerfile: Base.Dockerfile
     healthcheck:
-      test: curl -f http://localhost:5000/nodes || exit 1
+      test: curl -f http://localhost:5000/ping || exit 1
       interval: 10s
       timeout: 10s
       retries: 5

@@ -42,7 +42,7 @@ class PredictingMonitor:
                 prediction = p.get_prediction_at(now)
                 logging.debug(f"Prediction @ {now}: {prediction.values}")
             except ValueError:
-                logging.debug(f"get_prediction returned execption: {ValueError}")
+                logging.debug(f"get_prediction returned exception: {ValueError}")
                 # TODO: keep track of last synchronization and only send required data
                 new_data = p.get_measurements_in_current_prediction_horizon(now)
                 p.update_prediction_horizon(now)

@@ -94,9 +94,11 @@ class Predictor:
         if self._prediction_horizon is None:
             return None
         else:
-            assert self.in_prediction_horizon(until)
-            elapsed_hours = int((until - self.prediction_horizon_start).total_seconds() / 3600)
-            return self._data.get_measurements_previous_hours(until, elapsed_hours)
+            # assert self.in_prediction_horizon(until)
+            # elapsed_hours = int((until - self.prediction_horizon_start).total_seconds() / 3600)
+            # return self._data.get_measurements_previous_hours(until, elapsed_hours)
+            indexes = self._prediction_horizon.df.index.to_series().between(self.prediction_horizon_start, until)
+            return self._prediction_horizon.df.loc[indexes]
 
     def get_predictions_until(self, until: datetime) -> Optional[pd.DataFrame]:
         if self._prediction_horizon is None:

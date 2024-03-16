@@ -8,8 +8,8 @@ import tensorflow as tf
 from flask import request, send_file
 
 from base import app
-from base.deployment_strategy import DeployOnceStrategy
-from base.learning_strategy import RetrainStrategy
+from base.deployment_strategy import CorrectiveStrategy
+from base.learning_strategy import NoUpdateStrategy
 from base.model import Model
 from base.node_manager import NodeManager
 from common import ThresholdMetric
@@ -27,9 +27,11 @@ with open(os.path.join(app.config['MODEL_DIR'], f'{base_model_id}.json'), 'r') a
     metadata = ModelMetadata.from_dict(json.load(fp))
 base_model = Model(tf.keras.models.load_model(os.path.join(app.config['MODEL_DIR'], base_model_id)), metadata)
 # TODO: make the strategies configurable
-cl_strategy = RetrainStrategy()
+# cl_strategy = RetrainStrategy()
+cl_strategy = NoUpdateStrategy()
 cl_strategy.add_model(base_model)
-node_manager = NodeManager(cl_strategy, DeployOnceStrategy(), app.config['MODEL_DIR'])
+deploy_strategy = CorrectiveStrategy()
+node_manager = NodeManager(cl_strategy, deploy_strategy, app.config['MODEL_DIR'])
 logging.info(f'Loaded initial model with ID={base_model_id} and started node manager')
 
 

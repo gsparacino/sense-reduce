@@ -27,7 +27,7 @@ with open(os.path.join(app.config['MODEL_DIR'], f'{base_model_id}.json'), 'r') a
     metadata = ModelMetadata.from_dict(json.load(fp))
 base_model = Model(tf.keras.models.load_model(os.path.join(app.config['MODEL_DIR'], base_model_id)), metadata)
 # TODO: make the strategies configurable
-# cl_strategy = RetrainStrategy()
+# cl_strategy = RetrainStrategy(epochs=10, patience=3)
 cl_strategy = NoUpdateStrategy()
 cl_strategy.add_model(base_model)
 deploy_strategy = CorrectiveStrategy()
@@ -77,7 +77,7 @@ def post_violation(node_id: str):
 def post_update(node_id: str):
     """Called when a sensor node reaches the end of its prediction horizon."""
     body = request.get_json(force=True)
-    logging.info(f'Received update message from node {node_id} with timestamp {body["timestamp"]}')
+    logging.info(f'Received update message from node {node_id} with body {body}')
     dt = datetime.fromisoformat(body['timestamp'])
 
     new_model = node_manager.on_horizon_update(node_id, dt, pd.read_json(body['data']))

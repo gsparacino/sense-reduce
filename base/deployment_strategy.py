@@ -182,7 +182,11 @@ class CorrectiveStrategy(DeploymentStrategy):
         measurement = node.threshold_violations.get_measurements().loc[dt]
 
         for model in candidate_models():
-            input_df = node.data.get_measurements_previous_hours(node.last_synchronization, model.metadata.input_length)
+            input_df = node.data.get_measurements_previous_hours(
+                node.last_synchronization,
+                model.metadata.input_length,
+                node.predictor.get_prediction_timedelta()
+            )
             last_hour = input_df.index.max()
             prediction = model.predict(input_df)
             prediction.loc[last_hour] = input_df.loc[last_hour]

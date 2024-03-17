@@ -123,7 +123,8 @@ class DataStorage:
     def get_predictions(self) -> pd.DataFrame:
         return self._predictions
 
-    def get_measurements_previous_hours(self, dt: datetime.datetime, n_hours: int) -> pd.DataFrame:
+    def get_measurements_previous_hours(self, dt: datetime.datetime, n_hours: int,
+                                        timedelta: datetime.timedelta) -> pd.DataFrame:
         """Returns the measurements at the full hours before the specified timestamp (inclusive).
 
         If there are no measurements for a full hour, the values of the next one are used.
@@ -133,10 +134,10 @@ class DataStorage:
         # result: pd.DataFrame = self._measurements.iloc[idx].copy()
         # result.set_index(pd.DatetimeIndex(hours), inplace=True)
         timestamps = list(
-            timestamps_before(dt, n_hours, datetime.timedelta(seconds=1))
+            timestamps_before(dt, n_hours, timedelta)
         )
-        idx = self._measurements.index.get_indexer(timestamps, method='nearest')
-        result: pd.DataFrame = self._measurements.iloc[idx].copy()
+        corresponding_measurements_idx = (self._measurements.index.searchsorted(timestamps) - 1)
+        result: pd.DataFrame = self._measurements.iloc[corresponding_measurements_idx].copy()
         result.set_index(pd.DatetimeIndex(timestamps), inplace=True)
         return result
 

@@ -47,7 +47,7 @@ class PredictionHorizon:
 class Predictor:
     """Uses a PredictionModel to provide predictions for arbitrary timestamps in the prediction range of the model."""
 
-    def __init__(self, model: PredictionModel, data: DataStorage, prediction_period_s: int) -> None:
+    def __init__(self, model: PredictionModel, data: DataStorage, prediction_period_s: float) -> None:
         assert model.metadata.output_length <= 24  # self.get_prediction_at(dt) expects a horizon of less than a day
         self._model = model
         self._data = data
@@ -136,7 +136,9 @@ class Predictor:
                           )
             return
 
-        previous_m = self._data.get_measurements_previous_hours(start, self._model.metadata.input_length)
+        previous_m = self._data.get_measurements_previous_hours(start,
+                                                                self._model.metadata.input_length,
+                                                                self._prediction_period_s)
         new_horizon = self._model.predict(previous_m, self._prediction_period_s)
 
         # we also need the last measurement for interpolation
@@ -147,3 +149,6 @@ class Predictor:
         previous_ip = self._prediction_horizon
         self._prediction_horizon = PredictionHorizon(new_horizon)
         logging.debug(f'Updated prediction horizon from\n{previous_ip}\nto\n{self._prediction_horizon}')
+
+    def get_prediction_timedelta(self):
+        return self._prediction_period_s

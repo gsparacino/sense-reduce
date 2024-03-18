@@ -29,6 +29,11 @@ class DataStorage:
     def rmse(self) -> pd.Series:
         return self.mse ** 0.5
 
+    @staticmethod
+    def find_nearest_index(indices, value):
+        idx = (np.abs(indices - value)).argmin()
+        return idx
+
     @classmethod
     def from_data(cls, measurements: pd.DataFrame, predictions: pd.DataFrame) -> 'DataStorage':
         storage = cls(measurements.columns, predictions.columns)
@@ -129,15 +134,11 @@ class DataStorage:
 
         If there are no measurements for a full hour, the values of the next one are used.
         """
-        # hours = list(full_hours_before(dt, n_hours))  # will result in an already sorted list
-        # idx = self._measurements.index.get_indexer(hours, method='nearest')
-        # result: pd.DataFrame = self._measurements.iloc[idx].copy()
-        # result.set_index(pd.DatetimeIndex(hours), inplace=True)
         timestamps = list(
             timestamps_before(dt, n_hours, timedelta)
         )
-        corresponding_measurements_idx = (self._measurements.index.searchsorted(timestamps) - 1)
-        result: pd.DataFrame = self._measurements.iloc[corresponding_measurements_idx].copy()
+        idx = [self.find_nearest_index(self._measurements.index, timestamp) for timestamp in timestamps]
+        result: pd.DataFrame = self._measurements.iloc[idx].copy()
         result.set_index(pd.DatetimeIndex(timestamps), inplace=True)
         return result
 

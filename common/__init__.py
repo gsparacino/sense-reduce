@@ -1,4 +1,5 @@
 from .data_storage import *
+from .event_logger import *
 from .lite_model import *
 from .prediction_model import *
 from .predictor import *

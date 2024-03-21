@@ -9,13 +9,14 @@ from flask import request, send_file
 
 from base import app
 from base.deployment_strategy import CorrectiveStrategy
-from base.learning_strategy import NoUpdateStrategy
+from base.learning_strategy import RetrainStrategy
 from base.model import Model
 from base.node_manager import NodeManager
-from common import ThresholdMetric
+from common import ThresholdMetric, EventLogger, LogEvent, LogEventType
 from common.model_metadata import ModelMetadata
 
 logging.basicConfig(level=logging.DEBUG)
+event_logger = EventLogger(app.config['LOG_DIR'])
 
 # define the dataset for training the model(s)
 training_df = pd.read_pickle(app.config['TRAINING_DF'])
@@ -27,8 +28,8 @@ with open(os.path.join(app.config['MODEL_DIR'], f'{base_model_id}.json'), 'r') a
     metadata = ModelMetadata.from_dict(json.load(fp))
 base_model = Model(tf.keras.models.load_model(os.path.join(app.config['MODEL_DIR'], base_model_id)), metadata)
 # TODO: make the strategies configurable
-# cl_strategy = RetrainStrategy(epochs=10, patience=3)
-cl_strategy = NoUpdateStrategy()
+cl_strategy = RetrainStrategy(epochs=10, patience=1)
+# cl_strategy = NoUpdateStrategy()
 cl_strategy.add_model(base_model)
 deploy_strategy = CorrectiveStrategy()
 node_manager = NodeManager(cl_strategy, deploy_strategy, app.config['MODEL_DIR'])
@@ -53,6 +54,7 @@ def register_node(node_id: str):
     payload['model_metadata'] = node.predictor.model_metadata.to_dict()
     payload['initial_df'] = initial_df.to_json()
     logging.debug(f'Responding to new node with payload: {payload}')
+    event_logger.log_event(LogEvent(node_id, LogEventType.REGISTRATION))
     return payload
 
 
@@ -60,7 +62,9 @@ def register_node(node_id: str):
 def get_model(node_id: str):
     logging.info(f'Node "{node_id}" requested its model')
     # TODO: node_id must be UUID and should exist
-    return send_file(node_manager.on_model_deployment(node_id, datetime.now()))
+    model_file = node_manager.on_model_deployment(node_id, datetime.now())
+    event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE, model_file))
+    return send_file(model_file)
 
 
 @app.post("/violation/<string:node_id>")
@@ -68,8 +72,10 @@ def post_violation(node_id: str):
     body = request.get_json(force=True)
     logging.info(f'Received violation message from node {node_id}: {body}')
     dt = datetime.fromisoformat(body['timestamp'])
-
+    event_logger.log_event(LogEvent(node_id, LogEventType.VIOLATION))
     new_model = node_manager.on_threshold_violation(node_id, dt, body['measurement'], pd.read_json(body['data']))
+    if new_model is not None:
+        event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE))
     return {'model_metadata': None if new_model is None else new_model.to_dict()}, 201
 
 
@@ -79,8 +85,10 @@ def post_update(node_id: str):
     body = request.get_json(force=True)
     logging.info(f'Received update message from node {node_id} with body {body}')
     dt = datetime.fromisoformat(body['timestamp'])
-
+    event_logger.log_event(LogEvent(node_id, LogEventType.HORIZON_UPDATE))
     new_model = node_manager.on_horizon_update(node_id, dt, pd.read_json(body['data']))
+    if new_model is not None:
+        event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE))
     return {'model_metadata': None if new_model is None else new_model.to_dict()}, 201
 
 
@@ -92,6 +100,7 @@ def post_measurement(node_id: str):
 
     dt = datetime.fromisoformat(body['timestamp'])
     node_manager.get_node(node_id).add_measurement(dt, body['measurement'])
+    event_logger.log_event(LogEvent(node_id, LogEventType.MEASUREMENT))
     return '', 201
 
 
@@ -99,7 +108,7 @@ def post_measurement(node_id: str):
 def get_prediction(node_id: str):
     """Returns the current prediction for the specified node."""
     logging.info(f'Request for temperature prediction at node {node_id}')
-
+    event_logger.log_event(LogEvent(node_id, LogEventType.PREDICTION))
     return node_manager.get_prediction_at(node_id, datetime.now()).to_json()
 
 

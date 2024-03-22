@@ -63,7 +63,7 @@ def get_model(node_id: str):
     logging.info(f'Node "{node_id}" requested its model')
     # TODO: node_id must be UUID and should exist
     model_file = node_manager.on_model_deployment(node_id, datetime.now())
-    event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE, model_file))
+    event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE, "Node request"))
     return send_file(model_file)
 
 
@@ -75,7 +75,7 @@ def post_violation(node_id: str):
     event_logger.log_event(LogEvent(node_id, LogEventType.VIOLATION))
     new_model = node_manager.on_threshold_violation(node_id, dt, body['measurement'], pd.read_json(body['data']))
     if new_model is not None:
-        event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE))
+        event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE, "Violation"))
     return {'model_metadata': None if new_model is None else new_model.to_dict()}, 201
 
 
@@ -88,7 +88,7 @@ def post_update(node_id: str):
     event_logger.log_event(LogEvent(node_id, LogEventType.HORIZON_UPDATE))
     new_model = node_manager.on_horizon_update(node_id, dt, pd.read_json(body['data']))
     if new_model is not None:
-        event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE))
+        event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE, "Horizon update"))
     return {'model_metadata': None if new_model is None else new_model.to_dict()}, 201
 
 

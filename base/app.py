@@ -28,7 +28,7 @@ with open(os.path.join(app.config['MODEL_DIR'], f'{base_model_id}.json'), 'r') a
     metadata = ModelMetadata.from_dict(json.load(fp))
 base_model = Model(tf.keras.models.load_model(os.path.join(app.config['MODEL_DIR'], base_model_id)), metadata)
 # TODO: make the strategies configurable
-cl_strategy = RetrainStrategy(epochs=10, patience=1)
+cl_strategy = RetrainStrategy(epochs=10, patience=1, event_logger=event_logger)
 # cl_strategy = NoUpdateStrategy()
 cl_strategy.add_model(base_model)
 deploy_strategy = CorrectiveStrategy()

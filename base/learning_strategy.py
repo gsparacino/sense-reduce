@@ -9,6 +9,7 @@ from base.model import Model
 from base.node import NodeID
 from base.training import mse_weighted
 from base.window_generator import WindowGenerator
+from common import EventLogger, LogEvent, LogEventType
 from common.utils import convert_datetime, normalize_df, split_df
 
 
@@ -63,7 +64,7 @@ class LearningStrategy(ABC):
         return {
             'type': self.__class__.__name__,
             'object': self.__dict__
-            }
+        }
 
     @classmethod
     def from_dict(cls, d: dict) -> 'LearningStrategy':
@@ -92,9 +93,10 @@ class LearningStrategy(ABC):
 class NoUpdateStrategy(LearningStrategy):
     """A wrapper for a non-continual model that does not execute any update."""
 
-    def __init__(self) -> None:
+    def __init__(self, event_logger: EventLogger) -> None:
         super().__init__()
         self.models = []
+        self.event_logger = event_logger
 
     def __repr__(self) -> str:
         return 'NoUpdateStrategy()'
@@ -103,7 +105,7 @@ class NoUpdateStrategy(LearningStrategy):
         return {
             'type': self.__class__.__name__,
             'object': {}
-            }
+        }
 
     def add_node(self, node_id: NodeID, initial_df: pd.DataFrame) -> None:
         return None
@@ -134,6 +136,7 @@ class TransferLearningStrategy(LearningStrategy):
     """
 
     def __init__(self,
+                 event_logger: EventLogger,
                  freeze_layers: List[Union[str, int]],
                  epochs: int = 100,
                  optimizer: str = 'adam',
@@ -146,6 +149,7 @@ class TransferLearningStrategy(LearningStrategy):
         self.optimizer_str = optimizer
         self.learning_rate = float(learning_rate)
         self.stride = int(stride)
+        self.event_logger = event_logger
 
         self.validation = None if validation is None else pd.Timedelta(validation)
 
@@ -175,10 +179,11 @@ class TransferLearningStrategy(LearningStrategy):
                 'learning_rate': self.learning_rate,
                 'stride': self.stride,
                 'validation': None if self.validation is None else str(self.validation),
-                }
             }
+        }
 
     def _retrain_node_model(self, node_id: NodeID):
+        self.event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_TRAIN, "Retraining"))
         model = self.node_id_to_model[node_id]
         df = self.node_id_to_data[node_id]
         old_weights = model.model.get_weights()
@@ -257,7 +262,7 @@ class TransferLearningStrategy(LearningStrategy):
             optimizer=self._get_optimizer(),
             loss=mse_weighted,
             metrics=[tf.metrics.MeanSquaredError(), tf.metrics.MeanAbsoluteError(), tf.metrics.RootMeanSquaredError()]
-            )
+        )
 
         # for new nodes, we do not retrain the model immediately
         self.node_id_to_changed[node_id] = False
@@ -293,6 +298,7 @@ class RetrainStrategy(LearningStrategy):
     """
 
     def __init__(self,
+                 event_logger: EventLogger,
                  epochs: int = 100,
                  patience: int = 20,
                  optimizer: str = 'adam',
@@ -307,6 +313,7 @@ class RetrainStrategy(LearningStrategy):
         self.learning_rate = float(learning_rate)
         self.stride = int(stride)
         self.use_initial_data = use_initial_data
+        self.event_logger = event_logger
 
         if validation is None:
             self.validation = None
@@ -336,8 +343,8 @@ class RetrainStrategy(LearningStrategy):
                 'stride': self.stride,
                 'validation': None if self.validation is None else str(self.validation),
                 'use_initial_data': self.use_initial_data,
-                }
             }
+        }
 
     def _get_optimizer(self) -> tf.optimizers.Optimizer:
         if self.optimizer_str == 'adam':
@@ -348,6 +355,7 @@ class RetrainStrategy(LearningStrategy):
             raise ValueError(f'Unsupported optimizer: {self.optimizer_str}')
 
     def _retrain_node_model(self, node_id: NodeID):
+        self.event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_TRAIN, "Retraining"))
         old_model = self.node_id_to_model[node_id].model
         md = self.node_id_to_model[node_id].metadata
         df = self.node_id_to_data[node_id]
@@ -390,7 +398,7 @@ class RetrainStrategy(LearningStrategy):
             optimizer=self._get_optimizer(),
             loss=mse_weighted,
             metrics=[tf.metrics.MeanSquaredError(), tf.metrics.MeanAbsoluteError(), tf.metrics.RootMeanSquaredError()]
-            )
+        )
         new_model.fit(window.train, validation_data=window.val, epochs=self.max_epochs, callbacks=cb, verbose=2)
 
         # if the model did not improve, do not change

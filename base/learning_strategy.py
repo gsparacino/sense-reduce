@@ -93,10 +93,10 @@ class LearningStrategy(ABC):
 class NoUpdateStrategy(LearningStrategy):
     """A wrapper for a non-continual model that does not execute any update."""
 
-    def __init__(self, event_logger: EventLogger) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self.models = []
-        self.event_logger = event_logger
+        self.event_logger = EventLogger()
 
     def __repr__(self) -> str:
         return 'NoUpdateStrategy()'
@@ -136,20 +136,19 @@ class TransferLearningStrategy(LearningStrategy):
     """
 
     def __init__(self,
-                 event_logger: EventLogger,
                  freeze_layers: List[Union[str, int]],
                  epochs: int = 100,
                  optimizer: str = 'adam',
                  learning_rate: float = 0.001,
                  stride: int = 1,
-                 validation: Optional[str] = None,
+                 validation: Optional[str] = None
                  ) -> None:
         self.freeze_layers = freeze_layers
         self.epochs = epochs
         self.optimizer_str = optimizer
         self.learning_rate = float(learning_rate)
         self.stride = int(stride)
-        self.event_logger = event_logger
+        self.event_logger = EventLogger()
 
         self.validation = None if validation is None else pd.Timedelta(validation)
 
@@ -298,7 +297,6 @@ class RetrainStrategy(LearningStrategy):
     """
 
     def __init__(self,
-                 event_logger: EventLogger,
                  epochs: int = 100,
                  patience: int = 20,
                  optimizer: str = 'adam',
@@ -313,7 +311,7 @@ class RetrainStrategy(LearningStrategy):
         self.learning_rate = float(learning_rate)
         self.stride = int(stride)
         self.use_initial_data = use_initial_data
-        self.event_logger = event_logger
+        self.event_logger = EventLogger()
 
         if validation is None:
             self.validation = None

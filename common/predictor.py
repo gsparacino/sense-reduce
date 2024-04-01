@@ -47,11 +47,11 @@ class PredictionHorizon:
 class Predictor:
     """Uses a PredictionModel to provide predictions for arbitrary timestamps in the prediction range of the model."""
 
-    def __init__(self, model: PredictionModel, data: DataStorage, prediction_period_s: float) -> None:
+    def __init__(self, model: PredictionModel, data: DataStorage, prediction_period: timedelta) -> None:
         assert model.metadata.output_length <= 24  # self.get_prediction_at(dt) expects a horizon of less than a day
         self._model = model
         self._data = data
-        self._prediction_period_s = timedelta(seconds=prediction_period_s)
+        self._prediction_period_s = timedelta(seconds=prediction_period.seconds)
         self._prediction_horizon: Optional[PredictionHorizon] = None
 
     @property
@@ -96,9 +96,10 @@ class Predictor:
         else:
             # assert self.in_prediction_horizon(until)
             # elapsed_hours = int((until - self.prediction_horizon_start).total_seconds() / 3600)
-            # return self._data.get_measurements_previous_hours(until, elapsed_hours)
-            indexes = self._prediction_horizon.df.index.to_series().between(self.prediction_horizon_start, until)
-            return self._prediction_horizon.df.loc[indexes]
+            measurements = self._data.get_measurements_between(self.prediction_horizon_start, until)
+            return measurements
+            # indexes = self._prediction_horizon.df.index.to_series().between(self.prediction_horizon_start, until)
+            # return self._prediction_horizon.df.loc[indexes]
 
     def get_predictions_until(self, until: datetime) -> Optional[pd.DataFrame]:
         if self._prediction_horizon is None:

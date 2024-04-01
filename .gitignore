@@ -1,6 +1,8 @@
 .idea
 base/__pycache__
-simulation/zamg/models
 simulation/zamg/data/**/*.csv
 .venv
 __pycache__
+**/models
+simulation/zamg/simulations/
+*.pickle

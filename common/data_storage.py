@@ -2,7 +2,6 @@ import datetime
 import os
 from typing import List
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -142,19 +141,15 @@ class DataStorage:
         result.set_index(pd.DatetimeIndex(timestamps), inplace=True)
         return result
 
+    def get_measurements_between(self, dt_start: datetime.datetime, dt_end: datetime.datetime) -> pd.DataFrame:
+        return self._measurements.loc[dt_start:dt_end]
+
     def get_diff(self, columns: List[str] = None) -> pd.DataFrame:
         """Returns the difference between measurements and predictions. Removes NaNs."""
         diff: pd.DataFrame = self._measurements.loc[:, self._predictions.columns] - self._predictions
         if columns is not None:
             diff = diff[columns]
         return diff[~diff.isna().any(axis=1)]
-
-    def plot(self):
-        """Creates a plot for every attribute, comparing measurements and predictions."""
-        for col in self._measurements.columns:
-            plt.plot(self._measurements[col], label='Measurement')
-            plt.plot(self._predictions[col], label='Prediction')
-            plt.show()
 
     def save(self, dir_path='.', csv_prefix='') -> None:
         os.makedirs(dir_path, exist_ok=True)

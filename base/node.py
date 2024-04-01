@@ -106,7 +106,7 @@ class Node:
 
         with open(os.path.join(path, 'node.json'), 'r') as f:
             d = json.load(f)
-        n = cls(d['uuid'], ThresholdMetric.from_dict(d['threshold_metric']), model, Predictor(lite_model, data))
+        n = cls(d['uuid'], ThresholdMetric.from_dict(d['threshold_metric']), model, Predictor(lite_model, data, ))
         n.last_synchronization = datetime.fromisoformat(d['last_synchronization'])
 
         n.threshold_violations = DataStorage.load(path, csv_prefix='threshold_violations')

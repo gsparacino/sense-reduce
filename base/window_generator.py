@@ -1,9 +1,7 @@
 from typing import List, Optional
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import tensorflow as tf
 
 
@@ -148,49 +146,3 @@ class WindowGenerator:
         )
 
         return ds.map(self.split_window)
-
-    def plot(self, plot_col: str, model=None, max_subplots=3, title=None):
-        inputs, outputs = self.example
-        plt.figure(figsize=(12, 8))
-        plot_col_index = self.input_features_indices[plot_col]
-        max_n = min(max_subplots, len(inputs))
-        for n in range(max_n):
-            plt.subplot(max_n, 1, n + 1)
-            plt.ylabel(f'{plot_col} [normed]')
-            plt.plot(self.input_indices, inputs[n, :, plot_col_index],
-                     label='Inputs', marker='.', zorder=-10)
-
-            if self.output_features:
-                output_col_index = self.output_features_indices.get(plot_col, None)
-            else:
-                output_col_index = plot_col_index
-
-            if output_col_index is None:
-                continue
-
-            plt.scatter(self.output_indices, outputs[n, :, output_col_index],
-                        edgecolors='k', label='Outputs', c='#2ca02c', s=64)
-            if model is not None:
-                predictions = model(inputs)
-                plt.scatter(self.output_indices, predictions[n, :, output_col_index],
-                            marker='X', edgecolors='k', label='Predictions',
-                            c='#ff7f0e', s=64)
-
-            if n == 0:
-                plt.legend()
-
-        if title:
-            plt.suptitle(title)
-
-        plt.xlabel('Time [h]')
-        plt.show()
-
-    def plot_distribution(self, columns: Optional[List[str]] = None):
-        if columns is None:
-            columns = self.df.columns
-        features = self.df[columns]
-        df = features.melt(var_name='Column', value_name='Normalized')
-        plt.figure(figsize=(12, 6))
-        ax = sns.violinplot(x='Column', y='Normalized', data=df)
-        _ = ax.set_xticklabels(features.keys(), rotation=90)
-        plt.show()

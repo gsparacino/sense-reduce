@@ -120,7 +120,7 @@ class NodeManager:
             predictor_model = LiteModel.load(self.get_node_dir(node_id))
         else:
             predictor_model = model
-        predictor = Predictor(predictor_model, initial_data.copy(), prediction_period_s)
+        predictor = Predictor(predictor_model, initial_data.copy(), timedelta(seconds=prediction_period_s))
         predictor.update_prediction_horizon(start_dt)
         node = Node(node_id, threshold_metric, model, predictor)
         self._node_ids_to_node[node_id] = node

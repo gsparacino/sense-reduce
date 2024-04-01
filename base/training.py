@@ -1,7 +1,6 @@
 import os
-from typing import Callable, Optional, List
+from typing import Callable, List
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import tensorflow as tf
 
@@ -136,8 +135,7 @@ def train_model(window: WindowGenerator,
                 without_validation=False,
                 model_dir='models',
                 model_name='model',
-                plot=False,
-                ) -> None:
+                ) -> (tf.keras.Model, tf.keras.callbacks.History):
     """Trains a Tensorflow Model and stores it in SavedModel and TFLite format.
 
     Args:
@@ -171,8 +169,6 @@ def train_model(window: WindowGenerator,
                         validation_data=window.val,
                         callbacks=[early_stopping, reduce_lr],
                         )
-    for metric in model.metrics_names:
-        plot_history(history, metric, path=os.path.join(path, f'history_{metric}.png'), show=plot)
 
     val_performance = model.evaluate(window.val)
     if without_validation:
@@ -186,10 +182,6 @@ def train_model(window: WindowGenerator,
         )  # train for a bit longer since we have more data (assuming train_split==0.8)
 
     test_performance = model.evaluate(window.test)
-
-    if plot:
-        for col in window.output_features:
-            window.plot(plot_col=col, model=model)
 
     print(' 📉️ Model Performance:')
     context = {'stride': window.stride, 'sampling_rate': window.sampling_rate}
@@ -217,19 +209,4 @@ def train_model(window: WindowGenerator,
     model = Model(model, metadata)
     model.save_and_convert(path)
     print(f' ✅ Model training finished')
-
-
-def plot_history(history, metric: str, path: Optional[str] = None, show: bool = True) -> None:
-    loss = history.history[metric]
-    val_loss = history.history[f'val_{metric}']
-    epochs = range(1, len(loss) + 1)
-    fig: plt.Figure = plt.figure()
-    plt.plot(epochs, loss, 'y', label="Training")
-    plt.plot(epochs, val_loss, 'b', label="Validation")
-    plt.title(metric)
-    plt.legend()
-    if show:
-        plt.show()
-    if path is not None:
-        fig.savefig(path)
-    plt.close(fig)
+    return model, history

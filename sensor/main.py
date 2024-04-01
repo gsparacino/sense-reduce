@@ -44,9 +44,9 @@ def run(threshold_metric: ThresholdMetric,
     logging.info(f'Starting sensor node with ID={NODE_ID} in "{data_reduction_mode}" mode, '
                  f'threshold={threshold_metric} and base={base_address}...'
                  )
-    prediction_period = check_interval * 3
+    prediction_period_s = check_interval * 3
     if data_reduction_mode == 'none':
-        register_node(base_address, threshold_metric, prediction_period)
+        register_node(base_address, threshold_metric, prediction_period_s)
         while True:
             current_time = datetime.datetime.now()
             send_measurement(current_time, sensor.measurement.values, base_address)
@@ -54,8 +54,9 @@ def run(threshold_metric: ThresholdMetric,
 
     elif data_reduction_mode == 'predict':
         # TODO extract register_node call from fetch_model_and_data, since it should be performed in any case
-        model, data = fetch_model_and_data(base_address, threshold_metric, prediction_period)
-        predictor = Predictor(model, data, prediction_period)
+        model, data = fetch_model_and_data(base_address, threshold_metric, prediction_period_s)
+        period = datetime.timedelta(seconds=prediction_period_s)
+        predictor = Predictor(model, data, period)
         predictor.update_prediction_horizon(datetime.datetime.now())
         monitor = PredictingMonitor(sensor, predictor)
 
@@ -161,9 +162,15 @@ def fetch_model(base_address: str, model_metadata: ModelMetadata) -> LiteModel:
     """
     try:
         r = requests.get(f'{base_address}/models/{NODE_ID}')
+        if r.status_code != 200:
+            logging.error(f'GET Model request to {base_address} returned status code {r.status_code}')
+            raise ValueError
+        basedir = os.path.abspath(os.path.dirname(__file__))
         file_name = f'{model_metadata.uuid}.tflite'
-        open(file_name, 'wb').write(r.content)
-        return LiteModel.from_tflite_file(file_name, model_metadata)
+        # TODO make models path configurable
+        model_path = os.path.join(basedir, 'models', file_name)
+        open(model_path, 'wb').write(r.content)
+        return LiteModel.from_tflite_file(model_path, model_metadata)
     except requests.exceptions.RequestException as e:
         logging.error(f'Failed to fetch prediction model from base station {base_address}: {e}')
         raise
@@ -231,12 +238,12 @@ def send_measurement(dt: datetime.datetime, measurement: np.ndarray, base_addres
         raise e
 
 
-def send_update(dt: datetime.datetime, data: pd.DataFrame, base_address: str, monitor: PredictingMonitor):
+def send_update(dt: datetime.datetime, data: pd.DataFrame, base_address: str, monitor: PredictingMonitor, ):
     """Communicates a horizon update to the specified base address.
 
     Args:
-        dt: The timestamp at which the horizon udpate is necessary a datetime object.
-        data: The (redcued) measurements that occured in the current prediction horizon as a NumPy array.
+        dt: The timestamp at which the horizon update is necessary a datetime object.
+        data: The (reduced) measurements that occurred in the current prediction horizon as a NumPy array.
         base_address: The address of the base station.
         monitor: The monitor that is used for prediction-based the reduction.
 
@@ -260,7 +267,7 @@ def send_update(dt: datetime.datetime, data: pd.DataFrame, base_address: str, mo
             model_metadata = ModelMetadata.from_dict(model_metadata)
             model = fetch_model(base_address, model_metadata)
 
-            new_predictor = Predictor(model, monitor.predictor.data)
+            new_predictor = Predictor(model, monitor.predictor.data, monitor.predictor.get_prediction_timedelta())
             new_predictor.update_prediction_horizon(dt)
             monitor.predictor = new_predictor
 
@@ -352,9 +359,9 @@ if __name__ == '__main__':
         sensor = DHT22Sensor()
     elif ARGS.sensor == 'mock':
         if ARGS.csv is not None:
-            from temperature_sensor_mock_csv import CsvMockSensor
+            from multivariate_sensor_mock_csv import MultivariateCsvMockSensor
 
-            sensor = CsvMockSensor(ARGS.csv)
+            sensor = MultivariateCsvMockSensor(ARGS.csv)
         else:
             from temperature_sensor_mock_random import RandomMockSensor
 

@@ -1,0 +1,6 @@
+log_level: DEBUG
+model_dir: models
+log_dir: logs
+data_dir: data
+base_model_id: zamg_vienna_2019_2019_simple_dense
+initial_data_pickle: zamg_vienna_hourly.pickle

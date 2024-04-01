@@ -1,6 +1,5 @@
-tensorflow==2.14.* # or tflite-runtime
-matplotlib==3.6.*
-seaborn==0.12.*
 numpy==1.24.*
 pandas==1.5.*
-requests
+tensorflow==2.14.*
+Requests==2.31.*
+keras_tuner==1.4.*

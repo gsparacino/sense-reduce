@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional, List, Callable
@@ -180,6 +181,7 @@ class CorrectiveStrategy(DeploymentStrategy):
     def on_threshold_violation(self, node: Node, dt: datetime, candidate_models: Callable[[], List[Model]]
                                ) -> Optional[Model]:
         measurement = node.threshold_violations.get_measurements().loc[dt]
+        now = datetime.now()
 
         for model in candidate_models():
             input_df = node.data.get_measurements_previous_hours(
@@ -193,9 +195,12 @@ class CorrectiveStrategy(DeploymentStrategy):
             ip = PredictionHorizon(prediction)
 
             model_pred = ip.get_prediction_at(dt)
+
             if not node.threshold_metric.is_threshold_violation(measurement, model_pred):
                 # TODO: maybe rank by threshold_score?
+                logging.info(f"Switching {node.uuid} model to {model.metadata.uuid} @ {now}")
                 return model
+
         return None
 
     def on_horizon_update(self, node: Node, dt: datetime, candidate_models: Callable[[], List[Model]]

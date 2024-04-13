@@ -1,15 +1,8 @@
-import json
+import logging
 import logging
 import os
 
-import pandas as pd
-import tensorflow as tf
-
-from base.deployment_strategy import CorrectiveStrategy
-from base.learning_strategy import RetrainStrategy
-from base.model import Model
-from base.node_manager import NodeManager
-from common import ModelMetadata, EventLogger
+from common import EventLogger
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -33,27 +26,3 @@ class Config(object):
         self.data_dir = data_dir
         self.base_model_id = base_model_id
         self.initial_data_pickle = initial_data_pickle
-
-    @classmethod
-    def load_training_data(cls) -> pd.DataFrame:
-        path = os.path.join(cls._BASEDIR, 'data', 'zamg_vienna_hourly.pickle')
-        logging.info(f'Loading the training dataset from "{path}"')
-        return pd.read_pickle(path)
-
-    @classmethod
-    def load_base_model(cls) -> Model:
-        base_model_id = 'zamg_vienna_2019_2019_simple_dense'
-        logging.info(f'Loading initial model with ID={base_model_id}')
-        model_path = os.path.join(cls._BASEDIR, cls.MODEL_DIR, base_model_id)
-        with open(os.path.join(model_path, 'metadata.json'), 'r') as fp:
-            metadata = ModelMetadata.from_dict(json.load(fp))
-            return Model(tf.keras.models.load_model(model_path), metadata)
-
-    @classmethod
-    def load_node_manager(cls) -> NodeManager:
-        logging.info(f'Starting Node Manager')
-        cl_strategy = RetrainStrategy(epochs=10, patience=1)
-        # cl_strategy = NoUpdateStrategy()
-        cl_strategy.add_model(cls.BASE_MODEL)
-        deploy_strategy = CorrectiveStrategy()
-        return NodeManager(cl_strategy, deploy_strategy, Config.MODEL_DIR)

@@ -60,9 +60,18 @@ def register_node(node_id: str):
 
 
 @app.get("/models/<string:node_id>")
-def get_model(node_id: str):
+def get_default_model(node_id: str):
     logging.info(f'Node "{node_id}" requested its model')
     # TODO: node_id must be UUID and should exist
+    model_file = node_manager.on_model_deployment(node_id, datetime.now())
+    event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE, "Node request"))
+    return send_file(model_file)
+
+
+@app.get("/models/<string:node_id>/<string:model_id>")
+def get_model(node_id: str, model_id: str):
+    logging.info(f'Node "{node_id}" requested model {model_id}')
+    # TODO: use model_id to pick a model from the node's porfolio
     model_file = node_manager.on_model_deployment(node_id, datetime.now())
     event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE, "Node request"))
     return send_file(model_file)

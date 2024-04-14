@@ -1,6 +1,5 @@
 import argparse
 import datetime
-import functools
 import logging
 import os
 import time
@@ -13,6 +12,8 @@ import requests
 from common import Predictor, LiteModel, DataStorage, ThresholdMetric, ModelMetadata, L2Threshold
 from predicting_monitor import PredictingMonitor
 from sensor.abstract_sensor import AbstractSensor
+from sensor.base_station_gateway import BaseStationGateway
+from sensor.sensor_manager import SensorManager
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -21,7 +22,7 @@ def run(threshold_metric: ThresholdMetric,
         base_address: str,
         data_reduction_mode: str,
         wifi_toggle: bool,
-        check_interval: float,
+        time_interval: float,
         sensor: AbstractSensor
         ) -> None:
     """Starts a sensor node in SenseReduce, which connects to a base station and starts monitoring.
@@ -31,7 +32,7 @@ def run(threshold_metric: ThresholdMetric,
         base_address (str): The address of the base station, e.g., "192.168.0.1:100".
         data_reduction_mode (str): The data reduction mode applied, either "none" or "predict".
         wifi_toggle (bool): A flag indicating whether Wi-Fi should be turned off between transmissions.
-        check_interval (float): The regular interval in seconds for checking the sensor's readings.
+        time_interval (float): The regular interval in seconds for checking the sensor's readings.
         sensor (AbstractSensor): The implementation of AbstractSensor from which measurements are collected
 
     Returns:
@@ -44,37 +45,38 @@ def run(threshold_metric: ThresholdMetric,
     logging.info(f'Starting sensor node with ID={NODE_ID} in "{data_reduction_mode}" mode, '
                  f'threshold={threshold_metric} and base={base_address}...'
                  )
-    prediction_period_s = check_interval * 3
+    prediction_period = time_interval * 3
+    base_station = BaseStationGateway(base_address)
+    threshold_metric_to_dict = threshold_metric.to_dict()
+
     if data_reduction_mode == 'none':
-        register_node(base_address, threshold_metric, prediction_period_s)
+        base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_period)
         while True:
             current_time = datetime.datetime.now()
-            send_measurement(current_time, sensor.measurement.values, base_address)
-            time.sleep(check_interval)
+            base_station.send_measurement(NODE_ID, current_time, sensor.measurement.values)
+            time.sleep(time_interval)
 
     elif data_reduction_mode == 'predict':
-        # TODO extract register_node call from fetch_model_and_data, since it should be performed in any case
-        model, data = fetch_model_and_data(base_address, threshold_metric, prediction_period_s)
-        period = datetime.timedelta(seconds=prediction_period_s)
-        predictor = Predictor(model, data, period)
-        predictor.update_prediction_horizon(datetime.datetime.now())
-        monitor = PredictingMonitor(sensor, predictor)
+        model_metadata, data_storage = base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_period)
 
-        monitor.monitor(threshold_metric=threshold_metric,
-                        interval_seconds=check_interval,
-                        violation_callback=functools.partial(wifi_wrapper,
-                                                             wifi_toggle,
-                                                             send_violation,
-                                                             base_address=base_address,
-                                                             monitor=monitor,
-                                                             ),
-                        update_callback=functools.partial(wifi_wrapper,
-                                                          wifi_toggle,
-                                                          send_update,
-                                                          base_address=base_address,
-                                                          monitor=monitor,
-                                                          )
-                        )
+        model_data = base_station.fetch_model(NODE_ID, model_metadata)
+        period = datetime.timedelta(seconds=prediction_period)
+
+        basedir = os.path.abspath(os.path.dirname(__file__))
+        file_name = f'{model_metadata.uuid}.tflite'
+        model_path = os.path.join(basedir, 'models', file_name)
+        open(model_path, 'wb').write(model_data)
+        model = LiteModel.from_tflite_file(model_path, model_metadata)
+
+        predictor = Predictor(model, data_storage, period)
+        predictor.update_prediction_horizon(datetime.datetime.now())
+
+        # model, data = fetch_model_and_data(base_address, threshold_metric, prediction_period)
+        # period = datetime.timedelta(seconds=prediction_period)
+        # predictor = Predictor(model, data, period)
+
+        sensor_manager = SensorManager(NODE_ID, sensor, predictor, base_station)
+        sensor_manager.run(threshold_metric, time_interval)
 
     else:
         raise ValueError(f'Unsupported data reduction mode: {data_reduction_mode}')

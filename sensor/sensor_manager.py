@@ -1,13 +1,18 @@
 import datetime
 import logging
+import os
 import time
+from enum import Enum, auto
 
 from abstract_sensor import AbstractSensor
-from common import ThresholdMetric, Predictor
+from common import ThresholdMetric, Predictor, LiteModel
 from sensor.base_station_gateway import BaseStationGateway
 
 
 class SensorManager:
+    class _OperatingMode(Enum):
+        NORMAL = auto(),
+        ANOMALY = auto(),
 
     def __init__(self,
                  node_id: str,
@@ -27,6 +32,7 @@ class SensorManager:
         self.sensor = sensor
         self.predictor = predictor
         self.base_station_gateway = base_station_gateway
+        self._operating_mode = self._OperatingMode.NORMAL
 
     def run(self, threshold_metric: ThresholdMetric, time_interval: float) -> None:
         """Starts monitoring the sensor, coordinating with the Base Station by sending data notifying violations.
@@ -64,7 +70,21 @@ class SensorManager:
             if threshold_metric.is_threshold_violation(measurement, prediction.to_numpy()):
                 logging.info(f"Threshold violation: Measurement={measurement.values}, Prediction={prediction.values}")
                 new_data = predictor.get_measurements_in_current_prediction_horizon(now)
-                base_station.send_violation(node_id, now, measurements_array, new_data)
+                new_model = base_station.send_violation(node_id, now, measurements_array, new_data)
+                if new_model is not None:
+                    logging.debug(f"Base Station provided new model {new_model.uuid}.")
+                    model_bytes = base_station.fetch_model(node_id, new_model)
+                    basedir = os.path.abspath(os.path.dirname(__file__))
+                    file_name = f'{new_model.uuid}.tflite'
+                    model_path = os.path.join(basedir, 'models', file_name)
+                    open(model_path, 'wb').write(model_bytes)
+                    model = LiteModel.from_tflite_file(model_path, new_model)
+                    new_predictor = Predictor(model, predictor.data, predictor.get_prediction_timedelta())
+                    self.predictor = new_predictor
+                    predictor = new_predictor
+                else:
+                    logging.debug(f"Base Station did not provide a new model. Switching to ANOMALY operating mode.")
+                    self._operating_mode = self._OperatingMode.ANOMALY
                 predictor.update_prediction_horizon(now)
                 predictor.adjust_to_measurement(now, measurements_array, predictor.get_prediction_at(now).to_numpy())
 

@@ -1,4 +1,3 @@
-import datetime
 import logging
 import os
 from typing import Union
@@ -73,7 +72,7 @@ class LiteModel(PredictionModel):
             logging.warning(f'Interpreter output shape and metadata output shape do not match, '
                             f'{output_shape} != {self.metadata.output_shape}')
 
-    def predict(self, input_df: pd.DataFrame, timedelta: datetime.timedelta) -> pd.DataFrame:
+    def predict(self, input_df: pd.DataFrame) -> pd.DataFrame:
         """Runs a single inference on the interpreter.
 
         Args:
@@ -84,6 +83,7 @@ class LiteModel(PredictionModel):
             A pandas DataFrame with DatetimeIndex
         """
         last_ts = input_df.index.max()
+        timedelta = input_df.index[1] - input_df.index[0]
         input_df = (input_df - self.metadata.input_normalization_mean) / self.metadata.input_normalization_std
         convert_datetime(input_df, self.metadata.periodicity)
 

@@ -95,12 +95,11 @@ class Model(PredictionModel):
         self.save(model_dir)
         self.save_lite(model_dir)
 
-    def predict(self, x: pd.DataFrame, timedelta: datetime.timedelta = datetime.timedelta(minutes=1)) -> pd.DataFrame:
+    def predict(self, x: pd.DataFrame) -> pd.DataFrame:
         """Runs a single inference of the model.
 
         Args:
             x: A pandas.DataFrame with DatetimeIndex
-            timedelta: the desired time gap between consecutive predictions
 
         Returns:
             A pandas DataFrame with DatetimeIndex

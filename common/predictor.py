@@ -140,7 +140,7 @@ class Predictor:
         previous_m = self._data.get_measurements_previous_hours(start,
                                                                 self._model.metadata.input_length,
                                                                 self._prediction_period_s)
-        new_horizon = self._model.predict(previous_m, self._prediction_period_s)
+        new_horizon = self._model.predict(previous_m)
 
         # we also need the last measurement for interpolation
         last_ts = previous_m.index.max()

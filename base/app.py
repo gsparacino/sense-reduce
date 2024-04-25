@@ -9,7 +9,7 @@ from flask import request, send_file
 
 from base import app, config
 from base.deployment_strategy import CorrectiveStrategy
-from base.learning_strategy import RetrainStrategy
+from base.learning_strategy import PortfolioStrategy
 from base.model import Model
 from base.node_manager import NodeManager
 from common import ThresholdMetric, LogEvent, LogEventType, ModelMetadata
@@ -30,8 +30,9 @@ with open(os.path.join(path, 'metadata.json'), 'r') as fp:
     base_model = Model(tf.keras.models.load_model(path), metadata)
 
 # TODO: make the strategies configurable
-cl_strategy = RetrainStrategy(epochs=10, patience=1)
+# cl_strategy = RetrainStrategy(epochs=10, patience=1)
 # cl_strategy = NoUpdateStrategy()
+cl_strategy = PortfolioStrategy()
 cl_strategy.add_model(base_model)
 deploy_strategy = CorrectiveStrategy()
 node_manager = NodeManager(cl_strategy, deploy_strategy, os.path.join(BASEDIR, config.model_dir).__str__())
@@ -72,8 +73,8 @@ def get_default_model(node_id: str):
 def get_model(node_id: str, model_id: str):
     logging.info(f'Node "{node_id}" requested model {model_id}')
     # TODO: use model_id to pick a model from the node's porfolio
-    model_file = node_manager.on_model_deployment(node_id, datetime.now())
-    event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE, "Node request"))
+    model_file = node_manager.on_model_deployment(node_id, datetime.now(), model_id)
+    event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE, f"{model_id}"))
     return send_file(model_file)
 
 

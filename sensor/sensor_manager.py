@@ -12,7 +12,7 @@ from sensor.base_station_gateway import BaseStationGateway
 class SensorManager:
     class _OperatingMode(Enum):
         NORMAL = auto(),
-        ANOMALY = auto(),
+        NEW_MODEL = auto(),
 
     def __init__(self,
                  node_id: str,
@@ -67,7 +67,7 @@ class SensorManager:
             logging.debug(f"Prediction @ {now}: {prediction.values}")
             predictor.add_prediction(now, prediction.to_numpy())
 
-            if threshold_metric.is_threshold_violation(measurement, prediction.to_numpy()):
+            if threshold_metric.is_threshold_violation(measurements_array, prediction.to_numpy()):
                 logging.info(f"Threshold violation: Measurement={measurement.values}, Prediction={prediction.values}")
                 new_data = predictor.get_measurements_in_current_prediction_horizon(now)
                 new_model = base_station.send_violation(node_id, now, measurements_array, new_data)
@@ -83,9 +83,11 @@ class SensorManager:
                     self.predictor = new_predictor
                     predictor = new_predictor
                 else:
-                    logging.debug(f"Base Station did not provide a new model. Switching to ANOMALY operating mode.")
-                    self._operating_mode = self._OperatingMode.ANOMALY
+                    logging.debug(f"Base Station did not provide a new model. Switching to NEW_MODEL operating mode.")
+                    self._operating_mode = self._OperatingMode.NEW_MODEL
                 predictor.update_prediction_horizon(now)
                 predictor.adjust_to_measurement(now, measurements_array, predictor.get_prediction_at(now).to_numpy())
+            else:
+                self._operating_mode = self._OperatingMode.NORMAL
 
             time.sleep(time_interval)

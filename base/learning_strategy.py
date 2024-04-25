@@ -1,7 +1,9 @@
 import logging
+import uuid
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Union
 
+import numpy as np
 import pandas as pd
 import tensorflow as tf
 
@@ -9,7 +11,7 @@ from base.model import Model
 from base.node import NodeID
 from base.training import mse_weighted
 from base.window_generator import WindowGenerator
-from common import EventLogger, LogEvent, LogEventType
+from common import EventLogger, LogEvent, LogEventType, ThresholdMetric, Predictor, DataStorage
 from common.utils import convert_datetime, normalize_df, split_df
 
 
@@ -27,7 +29,7 @@ class LearningStrategy(ABC):
     _builders = {}
 
     @abstractmethod
-    def add_node(self, node_id: NodeID, initial_df: pd.DataFrame) -> None:
+    def add_node(self, node_id: NodeID, initial_df: pd.DataFrame, threshold_metric: ThresholdMetric) -> None:
         """Adds a new node to the strategy and its associated initial data (can be empty)."""
         pass
 
@@ -107,7 +109,7 @@ class NoUpdateStrategy(LearningStrategy):
             'object': {}
         }
 
-    def add_node(self, node_id: NodeID, initial_df: pd.DataFrame) -> None:
+    def add_node(self, node_id: NodeID, initial_df: pd.DataFrame, threshold_metric: ThresholdMetric) -> None:
         return None
 
     def add_model(self, model: Model) -> None:
@@ -250,7 +252,7 @@ class TransferLearningStrategy(LearningStrategy):
         else:
             logging.warning('TransferLearningStrategy only supports one base model. Ignoring additional model.')
 
-    def add_node(self, node_id: NodeID, initial_df: pd.DataFrame) -> None:
+    def add_node(self, node_id: NodeID, initial_df: pd.DataFrame, threshold_metric: ThresholdMetric) -> None:
         if self.base_model is None:
             raise Exception('No base model set.')
 
@@ -421,7 +423,7 @@ class RetrainStrategy(LearningStrategy):
         else:
             logging.warning('RetrainStrategy only supports one base model. Ignoring additional model.')
 
-    def add_node(self, node_id: NodeID, initial_df: pd.DataFrame) -> None:
+    def add_node(self, node_id: NodeID, initial_df: pd.DataFrame, threshold_metric: ThresholdMetric) -> None:
         if self.base_model is None:
             raise Exception('No base model set.')
 
@@ -445,6 +447,130 @@ class RetrainStrategy(LearningStrategy):
                 self._retrain_node_model(node_id)
                 self.node_id_to_changed[node_id] = False
             return [self.node_id_to_model[node_id]]
+
+
+class PortfolioStrategy(LearningStrategy):
+
+    def __init__(self,
+                 epochs: int = 10,
+                 patience: int = 20,
+                 optimizer: str = 'adam',
+                 learning_rate: float = 0.001,
+                 stride: int = 1,
+                 validation: Optional[Union[str, float]] = None,
+                 ):
+        self.base_model: Model = None
+        self.portfolio: List[Model] = []
+        self.node_data: Dict[NodeID, pd.DataFrame] = {}
+        self.node_threshold_metrics: Dict[NodeID, pd.ThresholdMetric] = {}
+        self.optimizer = self._get_optimizer(optimizer, learning_rate)
+        self.epochs = epochs
+        self.patience = patience
+        self.learning_rate = learning_rate
+        self.stride = stride
+        self.validation = None if validation is None else pd.Timedelta(validation)
+        self.event_logger: EventLogger = EventLogger()
+
+    def add_node(self, node_id: NodeID, initial_df: pd.DataFrame, threshold_metric: ThresholdMetric) -> None:
+        self.node_data[node_id] = initial_df
+        self.node_threshold_metrics[node_id] = threshold_metric
+
+    def add_model(self, model: Model) -> None:
+        if self.base_model is None:
+            self.base_model = model
+        self.portfolio.append(model)
+
+    def add_new_measurements(self, node_id: NodeID, new_measurements: pd.DataFrame) -> None:
+        self.node_data[node_id] = pd.concat([self.node_data.get(node_id), new_measurements])
+
+    def get_candidate_models(self, node_id: NodeID) -> List[Model]:
+        # TODO: consider using some Out-of-Distribution detection system instead of doing a full round of predictions
+        candidates: List[Model] = []
+        for model in self.portfolio:
+            measurements = self.node_data[node_id]
+            initial_data = DataStorage.from_data(measurements.copy(),
+                                                 pd.DataFrame(columns=model.metadata.output_features, dtype=np.float64))
+            period = measurements.index[1] - measurements.index[0]
+            predictor = Predictor(model, initial_data.copy(), period)
+            last_timestamp = measurements.index.max()
+            predictor.update_prediction_horizon(last_timestamp)
+            prediction = predictor.get_prediction_at(last_timestamp)
+            measurement = measurements.loc[last_timestamp]
+            if not self.node_threshold_metrics[node_id].is_threshold_violation(measurement, prediction):
+                logging.debug(f'Adding model {model.metadata.uuid} to candidate models for node {node_id}.')
+                candidates.append(model)
+
+        if len(candidates) == 0:
+            logging.debug(f'No candidate models found for node {node_id}.')
+            # No fitting model has been found, train a new one
+            new_model = self._train_new_model(node_id)
+            candidates.append(new_model)
+            self.portfolio.append(new_model)
+
+        return candidates
+
+    def _train_new_model(self, node_id: NodeID):
+        self.event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_TRAIN, "Training new model"))
+        logging.info(f'Training new model for node {node_id}')
+        md = self.base_model.metadata
+        df = self.node_data[node_id]
+        convert_datetime(df, md.periodicity)
+
+        if self.validation is None:
+            train_df = df.copy()
+            val_df = None
+            cb = None
+        else:
+            cb = [
+                tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss',
+                                                     patience=int(self.patience / 2),
+                                                     mode='min',
+                                                     factor=0.2,
+                                                     verbose=1
+                                                     ),
+                tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=self.patience,
+                                                 restore_best_weights=True)]
+            if isinstance(self.validation, float):
+                train_df, val_df, _ = split_df(df, 1 - self.validation, self.validation)
+            else:  # self.validation is a timedelta
+                train_df = df.loc[:df.index[-1] - self.validation, :].copy()
+                val_df = df.loc[df.index[-1] - self.validation:, :].copy()
+
+        # adjust the normalization values to the new data
+        norm_mean, norm_std = normalize_df(md.input_features, train_df, [] if val_df is None else [val_df])
+        window = WindowGenerator(md.input_length, md.output_length, self.stride,
+                                 sampling_rate=1,  # TODO: support non-hourly data resolution
+                                 train_df=train_df, val_df=val_df, test_df=None,
+                                 norm_mean=norm_mean, norm_std=norm_std,
+                                 periodicity=md.periodicity,
+                                 input_features=md.input_features,
+                                 output_features=md.output_features
+                                 )
+        # reset the model weights
+        tf.keras.backend.clear_session()
+        new_model = tf.keras.models.clone_model(self.base_model.model)
+        new_model.compile(
+            optimizer=self.optimizer,
+            loss=mse_weighted,
+            metrics=[tf.metrics.MeanSquaredError(), tf.metrics.MeanAbsoluteError(),
+                     tf.metrics.RootMeanSquaredError()]
+        )
+        new_model.fit(window.train, validation_data=window.val, epochs=self.epochs, callbacks=cb, verbose=2)
+
+        md = md.deepcopy()
+        md.uuid = str(uuid.uuid4())
+        md.input_normalization_mean = norm_mean
+        md.input_normalization_std = norm_std
+        return Model(new_model, md)
+
+    @staticmethod
+    def _get_optimizer(optimizer: str, learning_rate: float, ) -> tf.optimizers.Optimizer:
+        if optimizer == 'adam':
+            return tf.keras.optimizers.legacy.Adam(learning_rate=learning_rate)
+        elif optimizer == 'rmsprop':
+            return tf.keras.optimizers.legacy.RMSprop(learning_rate=learning_rate)
+        else:
+            raise ValueError(f'Unsupported optimizer: {optimizer}')
 
 
 LearningStrategy.register_type(NoUpdateStrategy.__name__, NoUpdateStrategy)

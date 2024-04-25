@@ -99,7 +99,7 @@ class NodeManager:
         """
         if node_id in self._node_ids_to_node:
             logging.warning(f'Node with ID {node_id} has already been added to NodeManager')
-        self.cl_strategy.add_node(node_id, initial_df.copy())
+        self.cl_strategy.add_node(node_id, initial_df.copy(), threshold_metric)
         model = self.deploy_strategy.on_initial_deployment(
             functools.partial(self.cl_strategy.get_candidate_models, node_id),
             initial_df.copy(), start_dt)
@@ -115,9 +115,10 @@ class NodeManager:
             initial_data = DataStorage.from_data(initial_df.copy(),
                                                  pd.DataFrame(columns=model.metadata.output_features, dtype=np.float64))
 
-        model.save_and_convert(self.get_node_dir(node_id))
+        path = os.path.join(self.get_node_dir(node_id), model.metadata.uuid)
+        model.save_and_convert(path)
         if lite_model:
-            predictor_model = LiteModel.load(self.get_node_dir(node_id))
+            predictor_model = LiteModel.load(path)
         else:
             predictor_model = model
         predictor = Predictor(predictor_model, initial_data.copy(), timedelta(seconds=prediction_period_s))
@@ -201,7 +202,7 @@ class NodeManager:
             # the node manager will update its model after it has been fetched
             return deploy_model.metadata
 
-    def on_model_deployment(self, node_id: NodeID, dt: datetime) -> str:
+    def on_model_deployment(self, node_id: NodeID, dt: datetime, model_id: str) -> str:
         """Called when a node requested a new model. Updates the node's predictor in the node manager.
 
         Inherently, we run into a distributed synchronization problem here. We update the node's
@@ -211,6 +212,7 @@ class NodeManager:
 
         Args:
             node_id: The id of the node.
+            model_id: The UUID of the model requested by the node.
             dt: The datetime of the deployment request.
 
         Returns:
@@ -219,19 +221,22 @@ class NodeManager:
         logging.debug(f'Deploying new model for node {node_id}')
 
         node_dir = self.get_node_dir(node_id)
-        cl_model = Model.load(node_dir)
+        model_dir = os.path.join(node_dir, model_id)
+
+        cl_model = Model.load(model_dir)
 
         n = self.get_node(node_id)
         n.add_prediction_df(n.predictor.get_predictions_until(dt))
         if self._node_has_lite_model[node_id]:
-            n.predictor.set_model(LiteModel.load(node_dir), dt)
+            lite_model = LiteModel.load(model_dir)
+            n.predictor.set_model(lite_model, dt)
         else:
             n.predictor.set_model(cl_model, dt)
         n.cl_model = cl_model
         n.last_synchronization = dt
 
         # FIXME: this is not correct if we do not use a lite model
-        l_model_path = os.path.join(node_dir, LiteModel.FILE_NAME)
+        l_model_path = os.path.join(model_dir, LiteModel.FILE_NAME)
         n.add_model_deployment(dt, os.path.getsize(l_model_path))
         return l_model_path
 

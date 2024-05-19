@@ -7,7 +7,7 @@ import uuid
 
 import requests
 
-from common import Predictor, ThresholdMetric, L2Threshold, PredictionModel
+from common import Predictor, ThresholdMetric, L2Threshold
 from sensor.abstract_sensor import AbstractSensor
 from sensor.base_station_gateway import BaseStationGateway
 from sensor.model_manager import ModelManager
@@ -15,7 +15,7 @@ from sensor.sensor_manager import SensorManager
 
 logging.basicConfig(level=logging.DEBUG)
 
-model_manager = ModelManager('models')
+model_manager = ModelManager('models')  # TODO: make the model's path configurable
 
 
 def run(threshold_metric: ThresholdMetric,
@@ -45,7 +45,7 @@ def run(threshold_metric: ThresholdMetric,
     logging.info(f'Starting sensor node with ID={NODE_ID} in "{data_reduction_mode}" mode, '
                  f'threshold={threshold_metric} and base={base_address}...'
                  )
-    prediction_period = time_interval * 3
+    prediction_period = time_interval * 3  # TODO: make prediction_period configurable
     base_station = BaseStationGateway(base_address)
     threshold_metric_to_dict = threshold_metric.to_dict()
 
@@ -61,10 +61,9 @@ def run(threshold_metric: ThresholdMetric,
         model_id, model_metadata, data_storage = (
             base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_period))
 
-        model_bytes: bytes = base_station.fetch_model_bytes(NODE_ID, model_id)
+        model_bytes: bytes = base_station.fetch_model_file(NODE_ID, model_id)
         period = datetime.timedelta(seconds=prediction_period)
-        model_manager.save_model(model_bytes, model_id)
-        model: PredictionModel = model_manager.load_model(model_id, model_metadata)
+        model = model_manager.save_model(model_id, model_bytes, model_metadata)
 
         predictor = Predictor(model, data_storage, period)
         predictor.update_prediction_horizon(datetime.datetime.now())

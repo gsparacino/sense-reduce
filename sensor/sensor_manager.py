@@ -95,7 +95,7 @@ class SensorManager:
                 new_model_metadata = base_station.request_new_model(node_id, timestamp, new_data)
                 if new_model_metadata is not None:
                     logging.debug(f"Base Station provided new model {new_model_metadata.model_id}")
-                    model_bytes = base_station.fetch_model_bytes(node_id, new_model_metadata.model_id)
+                    model_bytes = base_station.fetch_model_file(node_id, new_model_metadata.model_id)
                     logging.debug(f"Model {new_model_metadata.model_id} fetched")
                     predictor = self._create_new_predictor(new_model_metadata, model_bytes)
                     self.current_predictor = predictor

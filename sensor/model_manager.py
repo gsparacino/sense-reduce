@@ -9,22 +9,31 @@ class ModelManager:
 
     def __init__(self, model_dir: str) -> None:
         self._model_dir = os.path.join(ModelManager.base_dir, model_dir)
+        self._models: dict[str, PredictionModel] = {}
 
-    def save_model(self, model_bytes: bytes, model_name: str) -> None:
+    def save_model(self, model_name: str, model_bytes: bytes, model_metadata: ModelMetadata) -> PredictionModel:
         """
         Saves a model into the Sensor's storage
 
-        :param model_bytes: the bytes of the model to save
         :param model_name: the ID of the model
+        :param model_bytes: the bytes of the model to save
+        :param model_metadata: the metadata of the model
         """
         save_model_as_tflite(model_bytes, self._model_dir, model_name)
+        model = load_model_from_tflite(self._model_dir, model_name, model_metadata)
+        self._models[model_name] = model
+        return model
 
-    def load_model(self, model_name: str, model_metadata: ModelMetadata) -> PredictionModel:
+    def get_model(self, model_name: str, model_metadata: ModelMetadata) -> PredictionModel:
         """
-        Loads a model from the Sensor's storage
+        Retrieves a model.
 
         :param model_name: the ID of the model to load
         :param model_metadata: the metadata of the model to load
         :return: the loaded prediction model
         """
-        return load_model_from_tflite(self._model_dir, model_name, model_metadata)
+        model = self._models.get(model_name)
+        if model is None:
+            model = load_model_from_tflite(self._model_dir, model_name, model_metadata)
+            self._models[model_name] = model
+        return model

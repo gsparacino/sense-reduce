@@ -105,7 +105,7 @@ class BaseStationGateway:
 
         return self._extract_model_metadata(response)
 
-    def fetch_model_bytes(self, node_id: str, model_id: str) -> bytes:
+    def fetch_model_file(self, node_id: str, model_id: str) -> bytes:
         """Fetches a specific prediction model from the Base Station.
 
         :param node_id: ID of the sensor node, as a string.

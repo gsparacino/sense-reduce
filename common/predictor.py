@@ -72,7 +72,7 @@ class Predictor:
 
     def set_model(self, other: PredictionModel, start: datetime):
         """Changes the underlying model of the predictor and resets the prediction horizon to the specified datetime."""
-        logging.debug(f'Changing predictor model from "{self._model.metadata.uuid}" to "{other.metadata.uuid}"')
+        logging.debug(f'Changing predictor model from "{self._model.metadata.model_id}" to "{other.metadata.model_id}"')
         self._model = other
         self._prediction_horizon = None
         self.update_prediction_horizon(start)
@@ -94,12 +94,8 @@ class Predictor:
         if self._prediction_horizon is None:
             return None
         else:
-            # assert self.in_prediction_horizon(until)
-            # elapsed_hours = int((until - self.prediction_horizon_start).total_seconds() / 3600)
             measurements = self._data.get_measurements_between(self.prediction_horizon_start, until)
             return measurements
-            # indexes = self._prediction_horizon.df.index.to_series().between(self.prediction_horizon_start, until)
-            # return self._prediction_horizon.df.loc[indexes]
 
     def get_predictions_until(self, until: datetime) -> Optional[pd.DataFrame]:
         if self._prediction_horizon is None:
@@ -137,9 +133,9 @@ class Predictor:
                           )
             return
 
-        previous_m = self._data.get_measurements_previous_hours(start,
-                                                                self._model.metadata.input_length,
-                                                                self._prediction_period_s)
+        previous_m = self._data.get_previous_measurements(start,
+                                                          self._model.metadata.input_length,
+                                                          self._prediction_period_s)
         new_horizon = self._model.predict(previous_m)
 
         # we also need the last measurement for interpolation

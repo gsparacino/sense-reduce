@@ -1,82 +1,74 @@
-from abc import ABC, abstractmethod
-from typing import List
+import os
 
 import pandas as pd
 
-from base.model import Model
-from base.node import NodeID
+from base import Config
+from base.model import Model, ModelID
+from base.model_trainer import DefaultModelTrainer
+from base.node_manager import NodeID
+from common import ModelMetadata
+from common.model_utils import clone_model, load_model, save_model
 
 
-# TODO: currently unused, should be used as a separate process to manage models on the base station
-class ModelManager(ABC):
-    """
-    An abstract class describing the interfaces for valid model managers.
+class ModelManager:
+    def __init__(
+            self,
+            config: Config
+    ):
+        self._model_trainer = DefaultModelTrainer(epochs=2)
+        self._config = config
+        self.base_model: Model = self._load_base_model(config)
 
-    The model manager is responsible for the management of the models on the base station.
-    It decides when and how to update maintained models, and which models to provide to
-    the node manager as deployment candidates.
-    """
-
-    _builders = {}
-
-    @abstractmethod
-    def get_candidate_models(self, node_id: NodeID) -> List[Model]:
+    def train_new_model(self, node_id: NodeID, model_metadata: ModelMetadata, data: pd.DataFrame = None) -> Model:
         """
-        Returns a list of models that are available for deployment to the node with the given id.
+        Trains a new model for the provided Node with the provided metadata, using the provided data as training set.
+
+        :param node_id: the ID of the node for which the model should be trained
+        :param model_metadata: the metadata of the new model
+        :param data: the training data
+        :return: the new Model
         """
-        pass
+        new_model = self._model_trainer.train_new_model(self.base_model.model, self.base_model.metadata, data)
+        self._save_model(node_id, new_model)
+        return new_model
 
-    @abstractmethod
-    def on_new_measurements(self, node_id: NodeID, df: pd.DataFrame) -> None:
+    def clone_model(self, node_id: NodeID, model: Model) -> Model:
         """
-        Called when new measurements are available for a node.
+        Clones a model for the provided Node, using the provided model's metadata.
 
-        Args:
-            node_id: The id of the node.
-            df: The new measurements.
+        :param node_id: the ID of the node for which the model should be created
+        :param model: the model to clone
+        :return: the new model
         """
-        pass
+        model = clone_model(model)
+        self._save_model(node_id, model)
+        return model
 
-    def to_dict(self) -> dict:
-        """Returns a dictionary representation of the model manager, without its current state.
-
-        Returns:
-            A dictionary where the key 'type' indicates the class and 'object' contains __init__ **kwargs.
+    def load_model(self, model_id: ModelID, node_id: NodeID = None) -> Model:
         """
-        return {
-            'type': self.__class__.__name__,
-            'object': self.__dict__
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict) -> 'ModelManager':
-        if d.get('type') is None or d.get('object') is None:
-            raise ValueError('Malformed dictionary: missing type or object field.')
-        builder = cls._builders.get(d['type'])
-        if builder is None:
-            raise ValueError(f'Unsupported model manager type: {d["type"]}')
-        return builder(**d['object'])
-
-    @classmethod
-    def register_type(cls, type_name: str, builder):
-        """Registers a builder function for a given model manager type.
-
-        Args:
-            type_name: The name of the model manager type.
-            builder: A function that takes the same arguments as the model manager's __init__ method
-            and returns an instance of the model manager.
+        Loads the model with the provided ID for the provided Node
+        '
+        :param model_id: the ID of the model to load
+        :param node_id: the ID of the node for which the model should be loaded
+        :return: the loaded model
         """
-        cls._builders[type_name] = builder
+        model_path = os.path.join(self._config.model_dir, node_id, model_id) if node_id \
+            else os.path.join(self._config.model_dir, model_id)
+        return load_model(model_path)
 
+    def get_model_file_path(self, model_id: ModelID, node_id: NodeID) -> os.path:
+        return os.path.join(self._config.model_dir, node_id, model_id, f"{model_id}.tflite")
 
-class NoUpdateManager(ModelManager):
-    """A model manager that never updates the models."""
+    def _save_model(self, node_id: NodeID, model: Model) -> None:
+        """
+        Saves a model as a file in the base station's model directory.
 
-    def get_candidate_models(self, node_id: NodeID) -> List[Model]:
-        return []
+        :param node_id: the ID of the node to which the model is associated
+        :param model: the model to save
+        """
+        model_path = os.path.join(self._config.model_dir, node_id, model.model_id)
+        save_model(model, model_path)
 
-    def on_new_measurements(self, node_id: NodeID, df: pd.DataFrame) -> None:
-        pass
-
-
-ModelManager.register_type(NoUpdateManager.__name__, NoUpdateManager)
+    def _load_base_model(self, config: Config) -> Model:
+        model_id = config.base_model_id
+        return self.load_model(model_id)

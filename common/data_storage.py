@@ -127,14 +127,24 @@ class DataStorage:
     def get_predictions(self) -> pd.DataFrame:
         return self._predictions
 
-    def get_measurements_previous_hours(self, dt: datetime.datetime, n_hours: int,
-                                        timedelta: datetime.timedelta) -> pd.DataFrame:
-        """Returns the measurements at the full hours before the specified timestamp (inclusive).
+    def get_previous_measurements(self,
+                                  until_dt: datetime.datetime,
+                                  number_of_measurements: int,
+                                  timedelta: datetime.timedelta
+                                  ) -> pd.DataFrame:
+        """
+        Returns the measurements within the provided time span, which starts at (until_dt) - (timedelta * number_of_measurements)
+        and ends at (until_dt).
+        If the sensor does not have enough measurements in the provided timeframe, older measurements are translated to
+        fill the missing timestamps, and added to the results.
 
-        If there are no measurements for a full hour, the values of the next one are used.
+        :param until_dt: the timestamp of the latest measurement to include in the results
+        :param number_of_measurements: the number of measurements to include in the results
+        :param timedelta: the interval between consecutive measurements in the results
+        :return: a DataFrame with the measurements within the provided time span
         """
         timestamps = list(
-            timestamps_before(dt, n_hours, timedelta)
+            timestamps_before(until_dt, number_of_measurements, timedelta)
         )
         idx = [self.find_nearest_index(self._measurements.index, timestamp) for timestamp in timestamps]
         result: pd.DataFrame = self._measurements.iloc[idx].copy()
@@ -142,6 +152,11 @@ class DataStorage:
         return result
 
     def get_measurements_between(self, dt_start: datetime.datetime, dt_end: datetime.datetime) -> pd.DataFrame:
+        """
+        :param dt_start: the start timestamp
+        :param dt_end: the end timestamp
+        :return: a DataFrame of measurements between the provided start and end timestamps.
+        """
         return self._measurements.loc[dt_start:dt_end]
 
     def get_diff(self, columns: List[str] = None) -> pd.DataFrame:

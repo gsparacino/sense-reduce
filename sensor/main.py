@@ -9,13 +9,16 @@ import numpy as np
 import pandas as pd
 import requests
 
-from common import Predictor, LiteModel, DataStorage, ThresholdMetric, ModelMetadata, L2Threshold
+from common import Predictor, LiteModel, DataStorage, ThresholdMetric, ModelMetadata, L2Threshold, PredictionModel
 from predicting_monitor import PredictingMonitor
 from sensor.abstract_sensor import AbstractSensor
 from sensor.base_station_gateway import BaseStationGateway
+from sensor.model_manager import ModelManager
 from sensor.sensor_manager import SensorManager
 
 logging.basicConfig(level=logging.DEBUG)
+
+model_manager = ModelManager('models')
 
 
 def run(threshold_metric: ThresholdMetric,
@@ -50,6 +53,7 @@ def run(threshold_metric: ThresholdMetric,
     threshold_metric_to_dict = threshold_metric.to_dict()
 
     if data_reduction_mode == 'none':
+        # TODO: use NodeManager anyway
         base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_period)
         while True:
             current_time = datetime.datetime.now()
@@ -57,39 +61,30 @@ def run(threshold_metric: ThresholdMetric,
             time.sleep(time_interval)
 
     elif data_reduction_mode == 'predict':
-        model_metadata, data_storage = base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_period)
+        model_id, model_metadata, data_storage = (
+            base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_period))
 
-        model_data = base_station.fetch_model(NODE_ID, model_metadata)
+        model_bytes: bytes = base_station.fetch_model_bytes(NODE_ID, model_id)
         period = datetime.timedelta(seconds=prediction_period)
-
-        basedir = os.path.abspath(os.path.dirname(__file__))
-        file_name = f'{model_metadata.uuid}.tflite'
-        model_path = os.path.join(basedir, 'models', file_name)
-        open(model_path, 'wb').write(model_data)
-        model = LiteModel.from_tflite_file(model_path, model_metadata)
+        model_manager.save_model(model_bytes, model_id)
+        model: PredictionModel = model_manager.load_model(model_id, model_metadata)
 
         predictor = Predictor(model, data_storage, period)
         predictor.update_prediction_horizon(datetime.datetime.now())
 
-        # model, data = fetch_model_and_data(base_address, threshold_metric, prediction_period)
-        # period = datetime.timedelta(seconds=prediction_period)
-        # predictor = Predictor(model, data, period)
-
-        sensor_manager = SensorManager(NODE_ID, sensor, predictor, base_station)
+        sensor_manager = SensorManager(NODE_ID, sensor, predictor, base_station,
+                                       SensorManager.OperatingMode.DATA_REDUCTION)
         sensor_manager.run(threshold_metric, time_interval)
-
     else:
         raise ValueError(f'Unsupported data reduction mode: {data_reduction_mode}')
 
 
-def register_node(base_address: str, threshold_metric: ThresholdMetric,
-                  prediction_period_s: float) -> requests.Response:
+def register_node(base_address: str, threshold_metric: ThresholdMetric) -> requests.Response:
     """Registers the sensor node with the base station by providing its ID and threshold metric.
 
     Args:
         base_address: The address of the base station, e.g., "192.168.0.1:100".
         threshold_metric: The metric used to determine if a threshold has been reached.
-        prediction_period_s: The interval in seconds between consecutive predictions in a Prediction Horizon
 
     Returns:
         requests.Response: The response from the base station containing metadata and initial data in the body.
@@ -98,8 +93,7 @@ def register_node(base_address: str, threshold_metric: ThresholdMetric,
         requests.exceptions.RequestException: If an error occurs while sending the request.
     """
     body = {
-        'threshold_metric': threshold_metric.to_dict(),
-        'prediction_period_s': prediction_period_s
+        'threshold_metric': threshold_metric.to_dict()
     }
     logging.debug(f'Registering node {NODE_ID} with base station at {base_address}: {body}')
     try:
@@ -129,7 +123,7 @@ def fetch_model_and_data(base_address: str, threshold_metric: ThresholdMetric, p
     try:
         # TODO extract node registration
         # Register the node to receive model metadata and initial data
-        response = register_node(base_address, threshold_metric, prediction_period_s)
+        response = register_node(base_address, threshold_metric)
         body = response.json()
 
         # Download the model file from the base station and load it into a LiteModel object
@@ -168,7 +162,7 @@ def fetch_model(base_address: str, model_metadata: ModelMetadata) -> LiteModel:
             logging.error(f'GET Model request to {base_address} returned status code {r.status_code}')
             raise ValueError
         basedir = os.path.abspath(os.path.dirname(__file__))
-        file_name = f'{model_metadata.uuid}.tflite'
+        file_name = f'{model_metadata.model_id}.tflite'
         # TODO make models path configurable
         model_path = os.path.join(basedir, 'models', file_name)
         open(model_path, 'wb').write(r.content)

@@ -1,5 +1,4 @@
 import json
-
 from typing import List, Optional
 
 import pandas as pd
@@ -11,7 +10,7 @@ class ModelMetadata:
     FILE_NAME = 'metadata.json'
 
     def __init__(self,
-                 uuid: str,
+                 model_id: str,
                  input_features: List[str],
                  input_shape: tuple,
                  output_shape: tuple,
@@ -31,7 +30,7 @@ class ModelMetadata:
         assert all(map(lambda f: f in input_features, output_features)), \
             'Output features must be a subset of input features'
 
-        self.uuid = uuid
+        self.model_id = model_id
         self.input_features = input_features
         if output_features is None:
             self.output_features = input_features.copy()
@@ -82,12 +81,12 @@ class ModelMetadata:
         return [self.input_normalization_std[i] for i in self.input_to_output_indices]
 
     def __repr__(self) -> str:
-        return f'ModelMetadata(uuid={self.uuid},features={self.input_features},periodicity={self.periodicity},' \
+        return f'ModelMetadata(model_id={self.model_id},features={self.input_features},periodicity={self.periodicity},' \
                f'normalization_mean={self.input_normalization_mean},normalization_std={self.input_normalization_std},' \
                f'input_shape={self.input_shape},output_shape={self.output_shape})'
 
     def deepcopy(self) -> 'ModelMetadata':
-        return ModelMetadata(self.uuid,
+        return ModelMetadata(self.model_id,
                              self.input_features.copy(),
                              self.input_shape,
                              self.output_shape,
@@ -100,7 +99,7 @@ class ModelMetadata:
     def to_dict(self) -> dict:
         """ModelMetadata.from_dict(json.loads(json.dumps(model_metadata.to_dict()))) is idempotent."""
         return {
-            'uuid': self.uuid,
+            'model_id': self.model_id,
             'input_features': self.input_features,
             'output_features': self.output_features,
             'input_shape': self.input_shape,
@@ -114,7 +113,7 @@ class ModelMetadata:
     @classmethod
     def from_dict(cls, d: dict) -> 'ModelMetadata':
         """ModelMetadata.from_dict(json.loads(json.dumps(model_metadata.to_dict()))) is idempotent."""
-        return cls(uuid=d.get('uuid'),
+        return cls(model_id=d.get('model_id'),
                    input_features=d.get('input_features'),
                    output_features=d.get('output_features'),
                    input_shape=tuple(d.get('input_shape')),

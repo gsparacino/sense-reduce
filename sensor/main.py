@@ -58,12 +58,12 @@ def run(threshold_metric: ThresholdMetric,
             time.sleep(time_interval)
 
     elif data_reduction_mode == 'predict':
-        model_id, model_metadata, data_storage = (
+        model_metadata, data_storage = (
             base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_period))
 
-        model_bytes: bytes = base_station.fetch_model_file(NODE_ID, model_id)
+        model_bytes: bytes = base_station.fetch_model_file(NODE_ID, model_metadata.model_id)
         period = datetime.timedelta(seconds=prediction_period)
-        model = model_manager.save_model(model_id, model_bytes, model_metadata)
+        model = model_manager.save_model(model_bytes, model_metadata)
 
         predictor = Predictor(model, data_storage, period)
         predictor.update_prediction_horizon(datetime.datetime.now())

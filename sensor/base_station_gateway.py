@@ -7,7 +7,6 @@ import pandas as pd
 import requests
 from requests import RequestException, Response
 
-from base.model import ModelID
 from common import DataStorage, ModelMetadata
 
 
@@ -24,7 +23,7 @@ class BaseStationGateway:
     def register_node(self,
                       node_id: str,
                       threshold_metric: dict,
-                      frequency: float) -> (ModelID, ModelMetadata, DataStorage):
+                      frequency: float) -> (ModelMetadata, DataStorage):  # TODO: return object instead of Tuple
         """
         Registers the sensor node with the base station by providing its ID and threshold metric. The Base Station may
         respond with the metadata of the model to fetch.
@@ -47,11 +46,10 @@ class BaseStationGateway:
         if not response.ok:
             raise RequestException(f'POST {self.base_address}/register/{node_id} returned {response.status_code}')
 
-        model_id = response.json().get('model_id')
         model_metadata = self._extract_model_metadata(response)
         initial_df = self._extract_initial_df(response, model_metadata)
 
-        return model_id, model_metadata, initial_df
+        return model_metadata, initial_df
 
     def send_measurement(self, node_id: str, dt: datetime.datetime, measurement: np.ndarray) -> None:
         """

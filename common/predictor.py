@@ -59,6 +59,10 @@ class Predictor:
         return self._model.metadata
 
     @property
+    def model_id(self):
+        return self._model.metadata.model_id
+
+    @property
     def data(self) -> DataStorage:
         return self._data
 
@@ -69,6 +73,10 @@ class Predictor:
     @property
     def prediction_horizon_end(self):
         return self._prediction_horizon.end
+
+    @property
+    def prediction_period(self):
+        return self._prediction_period_s
 
     def set_model(self, other: PredictionModel, start: datetime):
         """Changes the underlying model of the predictor and resets the prediction horizon to the specified datetime."""

@@ -68,7 +68,7 @@ def run(threshold_metric: ThresholdMetric,
         predictor = Predictor(model, data_storage, period)
         predictor.update_prediction_horizon(datetime.datetime.now())
 
-        sensor_manager = SensorManager(NODE_ID, sensor, predictor, base_station,
+        sensor_manager = SensorManager(NODE_ID, sensor, predictor, base_station, model_manager,
                                        SensorManager.OperatingMode.DATA_REDUCTION)
         sensor_manager.run(threshold_metric, time_interval)
     else:

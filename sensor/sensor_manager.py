@@ -3,13 +3,13 @@ import logging
 import os
 import time
 from enum import Enum, auto
-from typing import Dict
 
 import pandas as pd
 
 from abstract_sensor import AbstractSensor
 from common import ThresholdMetric, Predictor, LiteModel
 from sensor.base_station_gateway import BaseStationGateway
+from sensor.model_manager import ModelManager
 
 NodeID = str
 
@@ -36,7 +36,8 @@ class SensorManager:
                  sensor: AbstractSensor,
                  predictor: Predictor,
                  base_station_gateway: BaseStationGateway,
-                 mode: OperatingMode = OperatingMode.DATA_REDUCTION,
+                 model_manager: ModelManager,
+                 mode: OperatingMode = OperatingMode.DATA_REDUCTION
                  ) -> None:
         """
         Manages a sensor's measurements and prediction models, as well as handling coordination with the Base Station.
@@ -50,9 +51,8 @@ class SensorManager:
         logging.debug(f"Initializing SensorManager for node: {node_id}")
         self.node_id = node_id
         self.sensor: AbstractSensor = sensor
-        self.current_predictor: Predictor = predictor
-        self._predictors: Dict[str, Predictor] = {}
-        self._add_predictor(predictor)
+        self.predictor: Predictor = predictor
+        self.model_manager: ModelManager = model_manager
         self.base_station_gateway: BaseStationGateway = base_station_gateway
         self._operating_mode = mode
 
@@ -64,7 +64,6 @@ class SensorManager:
         """
         assert time_interval > 0, "time_interval must be greater than 0."
         base_station = self.base_station_gateway
-        predictor = self.current_predictor
         node_id = self.node_id
 
         while True:
@@ -72,43 +71,49 @@ class SensorManager:
             logging.debug(f"Measurement @ {timestamp}: {measurement.values}")
 
             measurements_array = measurement.to_numpy()
-            predictor.add_measurement(timestamp, measurements_array)
+            self.predictor.add_measurement(timestamp, measurements_array)
 
             if self._operating_mode == SensorManager.OperatingMode.DATA_REDUCTION:
                 prediction = self._get_prediction(measurements_array, timestamp)
                 logging.debug(f"Prediction @ {timestamp}: {prediction.values}")
 
                 prediction_array = prediction.to_numpy()
-                predictor.add_prediction(timestamp, prediction_array)
+                self.predictor.add_prediction(timestamp, prediction_array)
 
                 if threshold_metric.is_threshold_violation(measurements_array, prediction_array):
                     # TODO: check if the violation actually requires a model change
                     logging.info(
                         f"Threshold violation: Measurement={measurement.values}, Prediction={prediction.values}"
                     )
-                    # TODO: add local model selection logic
-                    self._operating_mode = SensorManager.OperatingMode.MODEL_TRAINING
-                    logging.debug(f"Switching to {self._operating_mode.name}")
+                    new_predictor = self.model_manager.get_better_predictor(
+                        threshold_metric, self.predictor, timestamp, measurements_array, prediction
+                    )
+                    if new_predictor is None:
+                        self._operating_mode = SensorManager.OperatingMode.MODEL_TRAINING
+                        logging.debug(f"Switching to operating mode: {self._operating_mode.name}")
+                    else:
+                        self.predictor = new_predictor
+                        logging.debug(f"Switching to new model: {new_predictor.model_id}")
 
             if self._operating_mode == SensorManager.OperatingMode.MODEL_TRAINING:
-                new_data = predictor.get_measurements_in_current_prediction_horizon(timestamp)
+                new_data = self.predictor.get_measurements_in_current_prediction_horizon(timestamp)
                 new_model_metadata = base_station.request_new_model(node_id, timestamp, new_data)
                 if new_model_metadata is not None:
                     logging.debug(f"Base Station provided new model {new_model_metadata.model_id}")
                     model_bytes = base_station.fetch_model_file(node_id, new_model_metadata.model_id)
                     logging.debug(f"Model {new_model_metadata.model_id} fetched")
                     predictor = self._create_new_predictor(new_model_metadata, model_bytes)
-                    self.current_predictor = predictor
+                    self.predictor = predictor
                     self._operating_mode = SensorManager.OperatingMode.DATA_REDUCTION
-                    logging.debug(f"Switching to {self._operating_mode.name}")
-                predictor.update_prediction_horizon(timestamp)
-                predictor.adjust_to_measurement(timestamp, measurements_array,
-                                                predictor.get_prediction_at(timestamp).to_numpy())
+                    logging.debug(f"Switching to operating mode {self._operating_mode.name}")
+                self.predictor.update_prediction_horizon(timestamp)
+                self.predictor.adjust_to_measurement(timestamp, measurements_array,
+                                                     self.predictor.get_prediction_at(timestamp).to_numpy())
 
             time.sleep(time_interval)
 
     def _create_new_predictor(self, metadata, model_bytes: bytes) -> Predictor:
-        predictor = self.current_predictor
+        predictor = self.predictor
 
         basedir = os.path.abspath(os.path.dirname(__file__))
         file_name = f'{metadata.model_id}.tflite'
@@ -119,7 +124,7 @@ class SensorManager:
         return Predictor(model, predictor.data, predictor.get_prediction_timedelta())
 
     def _get_prediction(self, measurements_array, timestamp):
-        predictor = self.current_predictor
+        predictor = self.predictor
         node_id = self.node_id
         base_station = self.base_station_gateway
 
@@ -140,6 +145,3 @@ class SensorManager:
             logging.warning(f'{now} - Failed reading measurement from sensor. Retrying...')
             measurement = self.sensor.measurement
         return measurement, now
-
-    def _add_predictor(self, predictor: Predictor) -> None:
-        self._predictors[predictor.model_metadata.model_id] = predictor

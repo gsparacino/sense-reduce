@@ -6,7 +6,7 @@ from typing import Optional
 import numpy as np
 
 from common import ModelMetadata, PredictionModel, ThresholdMetric, Predictor
-from common.model_utils import save_model_as_tflite, load_model_from_tflite, save_model_metadata, load_model_metadata
+from common.model_utils import save_model_as_tflite, load_model_from_tflite
 
 
 class ModelManager:
@@ -14,41 +14,31 @@ class ModelManager:
 
     def __init__(self, model_dir: str) -> None:
         self._model_dir = os.path.join(ModelManager.base_dir, model_dir)
-        self._models: dict[str, PredictionModel] = {}  # TODO: load existing models from _model_dir
+        self._models: dict[str, PredictionModel] = {}
+        self._initialize_models()
 
-    def save_model(self, model_bytes: bytes, model_metadata: ModelMetadata) -> PredictionModel:
+    def save_model(self, model_bytes: bytes, metadata: ModelMetadata) -> PredictionModel:
         """
         Saves a model into the Sensor's storage
 
         :param model_bytes: the bytes of the model to save
-        :param model_metadata: the metadata of the model
+        :param metadata: the metadata of the model
         """
-        model_name = model_metadata.model_id
+        model_name = metadata.model_id
         model_dir = os.path.join(self._model_dir, model_name)
-        save_model_as_tflite(model_bytes, model_dir, model_name)
-        save_model_metadata(model_metadata, model_dir)
-        metadata = load_model_metadata(model_dir)
-        model = load_model_from_tflite(model_dir, model_name, metadata)
+        save_model_as_tflite(model_bytes, metadata, model_dir)
+        model = load_model_from_tflite(model_dir)
         self._models[model_name] = model
         return model
 
-    def get_model(self, model_metadata: ModelMetadata) -> PredictionModel:
+    def get_model_from_portfolio(self, model_name: str) -> Optional[PredictionModel]:
         """
-        Retrieves a model from the Sensor's storage.
+        Retrieves a model from the Sensor's portfolio, if present; otherwise returns None.
 
-        :param model_metadata: the metadata of the model to load
-        :return: the loaded prediction model
+        :param model_name: The name of the model to load
+        :return: The PredictionModel, or None if the model is not found
         """
-        model_name = model_metadata.model_id
-        model = self._models.get(model_name)
-        if model is None:
-            model_dir = os.path.join(self._model_dir, model_name)
-            metadata = load_model_metadata(model_dir)
-            metadata.input_normalization_mean = model_metadata.input_normalization_mean
-            metadata.input_normalization_std = model_metadata.input_normalization_std
-            model = load_model_from_tflite(model_dir, model_name, metadata)
-            self._models[model_name] = model
-        return model
+        return self._models.get(model_name)
 
     def get_new_predictor(self, threshold_metric: ThresholdMetric,
                           current_predictor: Predictor,
@@ -82,3 +72,13 @@ class ModelManager:
                 logging.debug(f"New best model: {predictor.model_id}")
 
         return best_predictor
+
+    def _initialize_models(self) -> None:
+        """
+        Initializes the Sensor's models portfolio by loading all TFLite models in its storage.
+        """
+        for item in os.scandir(self._model_dir):
+            if item.is_dir():
+                path = item.path
+                model = load_model_from_tflite(path)
+                self._models[model.metadata.model_id] = model

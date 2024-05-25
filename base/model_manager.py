@@ -7,7 +7,7 @@ from base.model import Model, ModelID
 from base.model_trainer import DefaultModelTrainer
 from base.node_manager import NodeID
 from common import ModelMetadata
-from common.model_utils import clone_model, load_model, save_model
+from common.model_utils import clone_model, load_model_from_savemodel, save_model
 
 
 class ModelManager:
@@ -54,7 +54,7 @@ class ModelManager:
         """
         model_path = os.path.join(self._config.model_dir, node_id, model_id) if node_id \
             else os.path.join(self._config.model_dir, model_id)
-        return load_model(model_path)
+        return load_model_from_savemodel(model_path)
 
     def get_model_file_path(self, model_id: ModelID, node_id: NodeID) -> os.path:
         return os.path.join(self._config.model_dir, node_id, model_id, f"{model_id}.tflite")

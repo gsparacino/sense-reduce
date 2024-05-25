@@ -8,19 +8,20 @@ from base.model import Model
 from common import ModelMetadata, PredictionModel, LiteModel
 
 
-def load_model(path: os.path) -> Model:
+def load_model_from_savemodel(path: os.path) -> Model:
     """
-    Loads the model from the specified directory, assuming it contains a 'metadata.json' file.
+    Loads the model from the specified directory, assuming it contains a 'metadata.json' file and model's file in a
+    SaveModel format.
 
-    :param path: the path to the directory containing the model
+    :param path: the path to the directory containing the model in SaveModel format
     :return: the loaded model
     """
-    metadata = load_model_metadata(path)
+    metadata = _load_model_metadata(path)
     keras_model = tf.keras.models.load_model(path)
     return Model(keras_model, metadata)
 
 
-def save_model_metadata(metadata: ModelMetadata, path: str) -> None:
+def _save_model_metadata(metadata: ModelMetadata, path: str) -> None:
     """
     Saves the model metadata in JSON format in the specified directory.
 
@@ -31,7 +32,7 @@ def save_model_metadata(metadata: ModelMetadata, path: str) -> None:
         json.dump(metadata.to_dict(), f, separators=(',', ':'))
 
 
-def load_model_metadata(path: str) -> ModelMetadata:
+def _load_model_metadata(path: str) -> ModelMetadata:
     """
     Loads the model metadata from the specified directory, assuming it contains a 'metadata.json' file.
 
@@ -62,37 +63,31 @@ def save_model(model: Model, path: os.path) -> None:
     # Save model in SaveModel's format
     keras_model = model.model
     keras_model.save(path)
-    save_model_metadata(model.metadata, path)
     # Save model's bytes in TFLite format
     model_bytes: bytes = _to_tflite_model_bytes(model.model)
-    save_model_as_tflite(model_bytes, path, model.model_id)
+    save_model_as_tflite(model_bytes, model.metadata, path)
 
 
-def save_model_as_tflite(model_bytes: bytes, path: os.path, model_name: str) -> None:
+def save_model_as_tflite(model_bytes: bytes, metadata: ModelMetadata, path: os.path) -> None:
     """
     Saves the model in TFLite format, and its metadata in JSON format.
 
-    :param model_bytes: the model to save, as a bytes string
-    :param path: the path to save the model to save
-    :param model_name: the name of the model to save
+    :param model_bytes: The model to save, as a bytes string
+    :param metadata: The metadata of the model to save
+    :param path: The path to save the model to save
     """
     os.makedirs(path, exist_ok=True)
-    model_path = _get_model_path(path, model_name)
+    _save_model_metadata(metadata, path)
+    model_path = get_model_path(path, metadata.model_id)
     with open(model_path, 'wb') as f:
         f.write(model_bytes)
 
 
-def load_model_from_tflite(path: os.path, model_name: str, model_metadata: ModelMetadata) -> PredictionModel:
-    """
-    Loads a model from a TFLite file.
-
-    :param path: the path to load the model from
-    :param model_name: the ID of the model to load
-    :param model_metadata: the metadata of the model to load
-    :return: the loaded PredictionModel
-    """
-    model_path = _get_model_path(path, model_name)
-    return LiteModel.from_tflite_file(model_path, model_metadata)
+def load_model_from_tflite(model_dir: str) -> PredictionModel:
+    metadata = _load_model_metadata(model_dir)
+    path = get_model_path(model_dir, metadata.model_id)
+    model = LiteModel.from_tflite_file(path, metadata)
+    return model
 
 
 def clone_model(model: Model) -> Model:
@@ -108,7 +103,7 @@ def clone_model(model: Model) -> Model:
     return Model(clone, metadata)
 
 
-def _get_model_path(model_dir: str, model_name: str):
+def get_model_path(model_dir: str, model_name: str):
     file_name = f'{model_name}.tflite'
     model_path = os.path.join(model_dir, file_name)
     return model_path

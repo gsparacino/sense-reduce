@@ -64,10 +64,12 @@ def run(threshold_metric: ThresholdMetric,
         model_metadata, data_storage = (
             base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_interval))
 
-        model_bytes: bytes = base_station.fetch_model_file(NODE_ID, model_metadata.model_id)
-        period = datetime.timedelta(seconds=prediction_interval)
-        model = model_manager.save_model(model_bytes, model_metadata)
+        model = model_manager.get_model_from_portfolio(model_metadata.model_id)
+        if model is None:
+            model_bytes: bytes = base_station.fetch_model_file(NODE_ID, model_metadata.model_id)
+            model = model_manager.save_model(model_bytes, model_metadata)
 
+        period = datetime.timedelta(seconds=prediction_interval)
         predictor = Predictor(model, data_storage, period)
         predictor.update_prediction_horizon(datetime.datetime.now())
 

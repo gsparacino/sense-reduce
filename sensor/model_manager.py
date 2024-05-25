@@ -1,4 +1,5 @@
 import datetime
+import logging
 import os
 from typing import Optional
 
@@ -42,11 +43,11 @@ class ModelManager:
             self._models[model_name] = model
         return model
 
-    def get_better_predictor(self, threshold_metric: ThresholdMetric,
-                             current_predictor: Predictor,
-                             timestamp: datetime.datetime,
-                             measurements: np.array,
-                             prediction: np.array) -> Optional[Predictor]:
+    def get_new_predictor(self, threshold_metric: ThresholdMetric,
+                          current_predictor: Predictor,
+                          timestamp: datetime.datetime,
+                          measurements: np.array,
+                          prediction: np.array) -> Optional[Predictor]:
         """
         Iterates over the available PredictionModels, compares their performance on the latest measurements and returns
         a Predictor with the best model.
@@ -67,7 +68,10 @@ class ModelManager:
             predictor.update_prediction_horizon(timestamp)
             prediction = predictor.get_prediction_at(timestamp).to_numpy()
             score = threshold_metric.threshold_score(measurements, prediction)
+            logging.debug(f"{predictor.model_id} score: {best_score}")
             if score < best_score:
                 best_score = score
                 best_predictor = predictor
+                logging.debug(f"New best model: {predictor.model_id}")
+
         return best_predictor

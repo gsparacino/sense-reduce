@@ -23,6 +23,8 @@ def run(threshold_metric: ThresholdMetric,
         data_reduction_mode: str,
         wifi_toggle: bool,
         time_interval: float,
+        cooldown: float,
+        prediction_interval: float,
         sensor: AbstractSensor
         ) -> None:
     """Starts a sensor node in SenseReduce, which connects to a base station and starts monitoring.
@@ -33,6 +35,8 @@ def run(threshold_metric: ThresholdMetric,
         data_reduction_mode (str): The data reduction mode applied, either "none" or "predict".
         wifi_toggle (bool): A flag indicating whether Wi-Fi should be turned off between transmissions.
         time_interval (float): The regular interval in seconds for checking the sensor's readings.
+        cooldown (float): The minimum time interval between consecutive violations to which the sensor should react.
+        prediction_interval (float): The time interval between consecutive predictions in the Prediction Horizon.
         sensor (AbstractSensor): The implementation of AbstractSensor from which measurements are collected
 
     Returns:
@@ -45,13 +49,12 @@ def run(threshold_metric: ThresholdMetric,
     logging.info(f'Starting sensor node with ID={NODE_ID} in "{data_reduction_mode}" mode, '
                  f'threshold={threshold_metric} and base={base_address}...'
                  )
-    prediction_period = time_interval * 3  # TODO: make prediction_period configurable
     base_station = BaseStationGateway(base_address)
     threshold_metric_to_dict = threshold_metric.to_dict()
 
     if data_reduction_mode == 'none':
         # TODO: use NodeManager anyway
-        base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_period)
+        base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_interval)
         while True:
             current_time = datetime.datetime.now()
             base_station.send_measurement(NODE_ID, current_time, sensor.measurement.values)
@@ -59,10 +62,10 @@ def run(threshold_metric: ThresholdMetric,
 
     elif data_reduction_mode == 'predict':
         model_metadata, data_storage = (
-            base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_period))
+            base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_interval))
 
         model_bytes: bytes = base_station.fetch_model_file(NODE_ID, model_metadata.model_id)
-        period = datetime.timedelta(seconds=prediction_period)
+        period = datetime.timedelta(seconds=prediction_interval)
         model = model_manager.save_model(model_bytes, model_metadata)
 
         predictor = Predictor(model, data_storage, period)
@@ -70,7 +73,7 @@ def run(threshold_metric: ThresholdMetric,
 
         sensor_manager = SensorManager(NODE_ID, sensor, predictor, base_station, model_manager,
                                        SensorManager.OperatingMode.DATA_REDUCTION)
-        sensor_manager.run(threshold_metric, time_interval)
+        sensor_manager.run(threshold_metric, time_interval, cooldown)
     else:
         raise ValueError(f'Unsupported data reduction mode: {data_reduction_mode}')
 
@@ -128,7 +131,15 @@ if __name__ == '__main__':
                         help='A flag for turning off Wi-Fi in-between transmissions.'
                         )
     parser.add_argument('--interval', type=float, default=5.0,
-                        help='The regular monitoring interval for measurements in seconds.'
+                        help='The time interval between consecutive measurement reads, in seconds (defaults to 5.0).'
+                        )
+    parser.add_argument('--prediction_interval', type=float, default=30.0,
+                        help='The time interval between consecutive predictions in the Prediction Horizon, '
+                             'in seconds (defaults to 30.0).'
+                        )
+    parser.add_argument('--cooldown', type=float, default=60.0,
+                        help='The "grace period" (in seconds, defaults to 60) between consecutive violations, i.e. a '
+                             'time interval during which the sensor does not react to threshold violations.'
                         )
     parser.add_argument('--threshold', type=float, default=1.0,
                         help='The threshold in degrees Celsius above which to report to the base station, default: 1.0.'
@@ -171,4 +182,4 @@ if __name__ == '__main__':
 
     NODE_ID = ARGS.id
     THRESHOLD = L2Threshold(ARGS.threshold, [0], [0])
-    run(THRESHOLD, ARGS.base, ARGS.mode, ARGS.wifi, ARGS.interval, sensor)
+    run(THRESHOLD, ARGS.base, ARGS.mode, ARGS.wifi, ARGS.interval, ARGS.cooldown, ARGS.prediction_interval, sensor)

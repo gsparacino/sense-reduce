@@ -154,7 +154,7 @@ class BaseStationGateway:
             'timestamp': dt.isoformat(),
             'data': data.to_json(),
         }
-        logging.debug(f'Node {node_id} requesting new model: {body}')
+        logging.debug(f'Requesting new model: {body}')
         response = requests.post(f'{self.base_address}/models/{node_id}/new', json=body)
         if not response.ok:
             raise RequestException(f'POST {self.base_address}/models/{node_id}/new returned {response.status_code}')

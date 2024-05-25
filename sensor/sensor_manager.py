@@ -1,13 +1,12 @@
 import datetime
 import logging
-import os
 import time
 from enum import Enum, auto
 
 import pandas as pd
 
 from abstract_sensor import AbstractSensor
-from common import ThresholdMetric, Predictor, LiteModel
+from common import ThresholdMetric, Predictor, ModelMetadata
 from sensor.base_station_gateway import BaseStationGateway
 from sensor.model_manager import ModelManager
 
@@ -55,14 +54,19 @@ class SensorManager:
         self.model_manager: ModelManager = model_manager
         self.base_station_gateway: BaseStationGateway = base_station_gateway
         self._operating_mode = mode
+        self._latest_violation_timestamp = None
 
-    def run(self, threshold_metric: ThresholdMetric, time_interval: float) -> None:
+    def run(self, threshold_metric: ThresholdMetric, time_interval: float, cooldown: float) -> None:
         """Starts monitoring the sensor, coordinating with the Base Station by sending data notifying violations.
 
         :param threshold_metric: A metric implementation that defines a threshold violation.
         :param time_interval: A float that represents the time period between consecutive measurements, in seconds.
+        :param cooldown: The minimum time interval between consecutive violations to which the sensor should react.
         """
         assert time_interval > 0, "time_interval must be greater than 0."
+        assert cooldown > 0, "cooldown must be greater than 0."
+        cooldown = datetime.timedelta(seconds=cooldown)
+
         base_station = self.base_station_gateway
         node_id = self.node_id
 
@@ -75,25 +79,33 @@ class SensorManager:
 
             if self._operating_mode == SensorManager.OperatingMode.DATA_REDUCTION:
                 prediction = self._get_prediction(measurements_array, timestamp)
-                logging.debug(f"Prediction @ {timestamp}: {prediction.values}")
+                logging.debug(f"Prediction by {self.predictor.model_id} @ {timestamp}: {prediction.values}")
 
                 prediction_array = prediction.to_numpy()
                 self.predictor.add_prediction(timestamp, prediction_array)
 
                 if threshold_metric.is_threshold_violation(measurements_array, prediction_array):
-                    # TODO: check if the violation actually requires a model change
-                    logging.info(
-                        f"Threshold violation: Measurement={measurement.values}, Prediction={prediction.values}"
-                    )
-                    new_predictor = self.model_manager.get_better_predictor(
-                        threshold_metric, self.predictor, timestamp, measurements_array, prediction
-                    )
-                    if new_predictor is None:
-                        self._operating_mode = SensorManager.OperatingMode.MODEL_TRAINING
-                        logging.debug(f"Switching to operating mode: {self._operating_mode.name}")
+                    if (self._latest_violation_timestamp is None or
+                            timestamp - self._latest_violation_timestamp > cooldown):
+                        self._latest_violation_timestamp = timestamp
+
+                        logging.info(
+                            f"Threshold violation: Measurement={measurement.values}, Prediction={prediction.values}"
+                        )
+                        new_predictor = self.model_manager.get_new_predictor(
+                            threshold_metric, self.predictor, timestamp, measurements_array, prediction
+                        )
+                        if new_predictor is None:
+                            self._operating_mode = SensorManager.OperatingMode.MODEL_TRAINING
+                            logging.debug(f"Switching to operating mode: {self._operating_mode.name}")
+                        else:
+                            self.predictor = new_predictor
+                            logging.debug(f"Switching to new model: {new_predictor.model_id}")
                     else:
-                        self.predictor = new_predictor
-                        logging.debug(f"Switching to new model: {new_predictor.model_id}")
+                        logging.debug(
+                            f"Threshold violation within the cooldown period, ignoring violations until "
+                            f"{self._latest_violation_timestamp + cooldown}"
+                        )
 
             if self._operating_mode == SensorManager.OperatingMode.MODEL_TRAINING:
                 new_data = self.predictor.get_measurements_in_current_prediction_horizon(timestamp)
@@ -107,21 +119,12 @@ class SensorManager:
                     self._operating_mode = SensorManager.OperatingMode.DATA_REDUCTION
                     logging.debug(f"Switching to operating mode {self._operating_mode.name}")
                 self.predictor.update_prediction_horizon(timestamp)
-                self.predictor.adjust_to_measurement(timestamp, measurements_array,
-                                                     self.predictor.get_prediction_at(timestamp).to_numpy())
 
             time.sleep(time_interval)
 
-    def _create_new_predictor(self, metadata, model_bytes: bytes) -> Predictor:
-        predictor = self.predictor
-
-        basedir = os.path.abspath(os.path.dirname(__file__))
-        file_name = f'{metadata.model_id}.tflite'
-        model_path = os.path.join(basedir, 'models', file_name)
-        open(model_path, 'wb').write(model_bytes)
-        model = LiteModel.from_tflite_file(model_path, metadata)
-
-        return Predictor(model, predictor.data, predictor.get_prediction_timedelta())
+    def _create_new_predictor(self, metadata: ModelMetadata, model_bytes: bytes) -> Predictor:
+        model = self.model_manager.save_model(model_bytes, metadata)
+        return Predictor(model, self.predictor.data, self.predictor.get_prediction_timedelta())
 
     def _get_prediction(self, measurements_array, timestamp):
         predictor = self.predictor

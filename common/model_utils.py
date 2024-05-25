@@ -15,13 +15,12 @@ def load_model(path: os.path) -> Model:
     :param path: the path to the directory containing the model
     :return: the loaded model
     """
-    metadata_path = os.path.join(path, ModelMetadata.FILE_NAME)
-    metadata = _load_model_metadata(str(metadata_path))
+    metadata = load_model_metadata(path)
     keras_model = tf.keras.models.load_model(path)
     return Model(keras_model, metadata)
 
 
-def _save_model_metadata(metadata: ModelMetadata, path: str) -> None:
+def save_model_metadata(metadata: ModelMetadata, path: str) -> None:
     """
     Saves the model metadata in JSON format in the specified directory.
 
@@ -32,14 +31,15 @@ def _save_model_metadata(metadata: ModelMetadata, path: str) -> None:
         json.dump(metadata.to_dict(), f, separators=(',', ':'))
 
 
-def _load_model_metadata(path: str) -> ModelMetadata:
+def load_model_metadata(path: str) -> ModelMetadata:
     """
     Loads the model metadata from the specified directory, assuming it contains a 'metadata.json' file.
 
     :param path: the path to the metadata file
     :return: a ModelMetadata instance
     """
-    with open(path, 'r') as f:
+    file_path = os.path.join(path, ModelMetadata.FILE_NAME)
+    with open(file_path, 'r') as f:
         file = json.load(f)
         return ModelMetadata.from_dict(file)
 
@@ -62,7 +62,7 @@ def save_model(model: Model, path: os.path) -> None:
     # Save model in SaveModel's format
     keras_model = model.model
     keras_model.save(path)
-    _save_model_metadata(model.metadata, path)
+    save_model_metadata(model.metadata, path)
     # Save model's bytes in TFLite format
     model_bytes: bytes = _to_tflite_model_bytes(model.model)
     save_model_as_tflite(model_bytes, path, model.model_id)

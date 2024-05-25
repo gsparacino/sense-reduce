@@ -6,7 +6,7 @@ from typing import Optional
 import numpy as np
 
 from common import ModelMetadata, PredictionModel, ThresholdMetric, Predictor
-from common.model_utils import save_model_as_tflite, load_model_from_tflite
+from common.model_utils import save_model_as_tflite, load_model_from_tflite, save_model_metadata, load_model_metadata
 
 
 class ModelManager:
@@ -14,7 +14,7 @@ class ModelManager:
 
     def __init__(self, model_dir: str) -> None:
         self._model_dir = os.path.join(ModelManager.base_dir, model_dir)
-        self._models: dict[str, PredictionModel] = {}
+        self._models: dict[str, PredictionModel] = {}  # TODO: load existing models from _model_dir
 
     def save_model(self, model_bytes: bytes, model_metadata: ModelMetadata) -> PredictionModel:
         """
@@ -24,14 +24,17 @@ class ModelManager:
         :param model_metadata: the metadata of the model
         """
         model_name = model_metadata.model_id
-        save_model_as_tflite(model_bytes, self._model_dir, model_name)
-        model = load_model_from_tflite(self._model_dir, model_name, model_metadata)
+        model_dir = os.path.join(self._model_dir, model_name)
+        save_model_as_tflite(model_bytes, model_dir, model_name)
+        save_model_metadata(model_metadata, model_dir)
+        metadata = load_model_metadata(model_dir)
+        model = load_model_from_tflite(model_dir, model_name, metadata)
         self._models[model_name] = model
         return model
 
     def get_model(self, model_metadata: ModelMetadata) -> PredictionModel:
         """
-        Retrieves a model.
+        Retrieves a model from the Sensor's storage.
 
         :param model_metadata: the metadata of the model to load
         :return: the loaded prediction model
@@ -39,7 +42,11 @@ class ModelManager:
         model_name = model_metadata.model_id
         model = self._models.get(model_name)
         if model is None:
-            model = load_model_from_tflite(self._model_dir, model_name, model_metadata)
+            model_dir = os.path.join(self._model_dir, model_name)
+            metadata = load_model_metadata(model_dir)
+            metadata.input_normalization_mean = model_metadata.input_normalization_mean
+            metadata.input_normalization_std = model_metadata.input_normalization_std
+            model = load_model_from_tflite(model_dir, model_name, metadata)
             self._models[model_name] = model
         return model
 

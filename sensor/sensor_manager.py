@@ -111,7 +111,7 @@ class SensorManager:
                 new_data = self.predictor.get_measurements_in_current_prediction_horizon(timestamp)
                 new_model_metadata = base_station.request_new_model(node_id, timestamp, new_data)
                 if new_model_metadata is not None:
-                    logging.debug(f"Base Station provided new model {new_model_metadata.model_id}")
+                    logging.debug(f"Base Station provided a new model {new_model_metadata.model_id}")
                     model = self.model_manager.add_model(new_model_metadata)
                     self.predictor = Predictor(model, self.predictor.data, self.predictor.get_prediction_timedelta())
                     self._operating_mode = SensorManager.OperatingMode.DATA_REDUCTION

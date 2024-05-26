@@ -66,7 +66,6 @@ def post_update(node_id: str):
         measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
         cluster_manager.add_measurements(node_id, measurements)
     payload = dict()
-    payload['model_metadata'] = new_model.metadata.to_dict()
     # TODO add notifications (e.g. model switch events) to the response
     return payload
 

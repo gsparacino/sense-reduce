@@ -64,9 +64,6 @@ def run(threshold_metric: ThresholdMetric,
             base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_interval))
 
         model = model_manager.get_model(model_metadata)
-        # if model is None:
-        #     model_bytes: bytes = base_station.fetch_model_file(NODE_ID, model_metadata.model_id)
-        #     model = model_manager.save_model(model_bytes, model_metadata)
 
         # TODO: move Predictor initialization into model_manager
         period = datetime.timedelta(seconds=prediction_interval)

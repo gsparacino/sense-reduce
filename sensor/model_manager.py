@@ -17,7 +17,7 @@ class ModelManager:
         """
         Manages the Sensor's portfolio of PredictionModels.
 
-        :param node_id: The Sensor's unique ID.
+        :param node_id: The Sensor's unique ID within its cluster.
         :param model_dir: The local directory in which the models are stored.
         :param base_station_gateway: A BaseStationGateway instance, used to interact with the Node's Base Station.
         """
@@ -27,7 +27,7 @@ class ModelManager:
         self._models: dict[str, PredictionModel] = {}
         self._load_local_models()
 
-    def save_model(self, model_bytes: bytes, metadata: ModelMetadata) -> PredictionModel:
+    def _save_model(self, model_bytes: bytes, metadata: ModelMetadata) -> PredictionModel:
         """
         Saves a model into the Sensor's storage
 
@@ -52,10 +52,10 @@ class ModelManager:
         model = self._models.get(model_name)
         if model is None:
             model_bytes: bytes = self._base_station.fetch_model_file(self.node_id, model_name)
-            model = self.save_model(model_bytes, metadata)
+            model = self._save_model(model_bytes, metadata)
         return model
 
-    def delete_model(self, model_name: str) -> None:
+    def _delete_model(self, model_name: str) -> None:
         """
         Removes a Model from the Sensor's portfolio, if present.
 
@@ -80,7 +80,9 @@ class ModelManager:
         :param timestamp: the timestamp when the latest measurements were taken
         :param measurements: the latest measurements
         :param prediction: the latest prediction
-        :return: a Predictor with the best model found
+
+        :return: a Predictor with the best possible PredictionModel according to the threshold_metric, or None if none
+        of the models has better performances than the current one.
         """
         best_score = threshold_metric.threshold_score(measurements, prediction)
         best_predictor = None

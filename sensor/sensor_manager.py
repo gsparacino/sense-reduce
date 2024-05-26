@@ -6,7 +6,7 @@ from enum import Enum, auto
 import pandas as pd
 
 from abstract_sensor import AbstractSensor
-from common import ThresholdMetric, Predictor, ModelMetadata
+from common import ThresholdMetric, Predictor
 from sensor.base_station_gateway import BaseStationGateway
 from sensor.model_manager import ModelManager
 
@@ -112,19 +112,13 @@ class SensorManager:
                 new_model_metadata = base_station.request_new_model(node_id, timestamp, new_data)
                 if new_model_metadata is not None:
                     logging.debug(f"Base Station provided new model {new_model_metadata.model_id}")
-                    model_bytes = base_station.fetch_model_file(node_id, new_model_metadata.model_id)
-                    logging.debug(f"Model {new_model_metadata.model_id} fetched")
-                    predictor = self._create_new_predictor(new_model_metadata, model_bytes)
-                    self.predictor = predictor
+                    model = self.model_manager.get_model(new_model_metadata)
+                    self.predictor = Predictor(model, self.predictor.data, self.predictor.get_prediction_timedelta())
                     self._operating_mode = SensorManager.OperatingMode.DATA_REDUCTION
                     logging.debug(f"Switching to operating mode {self._operating_mode.name}")
                 self.predictor.update_prediction_horizon(timestamp)
 
             time.sleep(time_interval)
-
-    def _create_new_predictor(self, metadata: ModelMetadata, model_bytes: bytes) -> Predictor:
-        model = self.model_manager.save_model(model_bytes, metadata)
-        return Predictor(model, self.predictor.data, self.predictor.get_prediction_timedelta())
 
     def _get_prediction(self, measurements_array, timestamp):
         predictor = self.predictor

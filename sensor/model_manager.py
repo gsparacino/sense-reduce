@@ -50,9 +50,19 @@ class ModelManager:
         """
         model_name = metadata.model_id
         model = self._models.get(model_name)
-        if model is None:
-            model_bytes: bytes = self._base_station.fetch_model_file(self.node_id, model_name)
-            model = self._save_model(model_bytes, metadata)
+        return model
+
+    def add_model(self, metadata: ModelMetadata) -> PredictionModel:
+        """
+        Adds a new model to the Sensor's portfolio, fetching it from the Base Station.
+
+        :param metadata: The ModelMetadata of the Model to add
+
+        :return: The new PredictionModel
+        """
+        model_name = metadata.model_id
+        model_bytes: bytes = self._base_station.fetch_model_file(self.node_id, model_name)
+        model = self._save_model(model_bytes, metadata)
         return model
 
     def _delete_model(self, model_name: str) -> None:

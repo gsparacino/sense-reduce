@@ -63,9 +63,10 @@ def run(threshold_metric: ThresholdMetric,
         model_metadata, data_storage = (
             base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_interval))
 
+        # TODO: move Predictor initialization into sensor_manager
         model = model_manager.get_model(model_metadata)
-
-        # TODO: move Predictor initialization into model_manager
+        if model is None:
+            model = model_manager.add_model(model_metadata)
         period = datetime.timedelta(seconds=prediction_interval)
         predictor = Predictor(model, data_storage, period)
         predictor.update_prediction_horizon(datetime.datetime.now())

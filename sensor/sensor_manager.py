@@ -47,7 +47,7 @@ class SensorManager:
         :param base_station_gateway: An instance of BaseStationGateway that handles coordination with the Base Station.
         :param mode: The sensor's initial operating mode.
         """
-        logging.debug(f"Initializing SensorManager for node: {node_id}")
+        logging.debug(f"Initializing SensorManager")
         self.node_id = node_id
         self.sensor: AbstractSensor = sensor
         self.predictor: Predictor = predictor

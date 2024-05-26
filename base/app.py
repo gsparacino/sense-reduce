@@ -53,7 +53,7 @@ def post_new_model_request(node_id: str):
 @app.get("/models/<string:node_id>/<string:model_id>")
 def get_model(node_id: str, model_id: str):
     logging.info(f'Node {node_id} requested model {model_id}')
-    model_file_path = cluster_manager.get_model_file_path(node_id, model_id)
+    model_file_path = cluster_manager.get_model_upload_path(model_id)
     event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE, f"{model_id}"))
     return send_file(model_file_path)
 

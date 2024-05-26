@@ -6,7 +6,8 @@ from typing import Optional
 import numpy as np
 
 from common import ModelMetadata, PredictionModel, ThresholdMetric, Predictor
-from common.model_utils import save_model_as_tflite, load_model_from_tflite, get_model_path, delete_tflite_model
+from common.model_utils import save_model_as_tflite, load_model_tflite, delete_tflite_model, \
+    get_model_dir_path
 from sensor.base_station_gateway import BaseStationGateway
 
 
@@ -35,9 +36,9 @@ class ModelManager:
         :param metadata: the metadata of the model
         """
         model_name = metadata.model_id
-        model_dir = os.path.join(self._model_dir, model_name)
+        model_dir = get_model_dir_path(self._model_dir, model_name)
         save_model_as_tflite(model_bytes, metadata, model_dir)
-        model = load_model_from_tflite(model_dir)
+        model = load_model_tflite(model_dir)
         self._models[model_name] = model
         return model
 
@@ -73,7 +74,7 @@ class ModelManager:
         """
         model_to_delete = self._models.pop(model_name)
         if model_to_delete:
-            path = get_model_path(self._model_dir, model_name)
+            path = get_model_dir_path(self._model_dir, model_name)
             delete_tflite_model(path)
 
     def get_new_predictor(self, threshold_metric: ThresholdMetric,
@@ -117,6 +118,5 @@ class ModelManager:
         """
         for item in os.scandir(self._model_dir):
             if item.is_dir():
-                path = item.path
-                model = load_model_from_tflite(path)
+                model = load_model_tflite(item.path)
                 self._models[model.metadata.model_id] = model

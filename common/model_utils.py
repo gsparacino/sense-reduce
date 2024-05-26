@@ -75,20 +75,20 @@ def save_model_as_tflite(model_bytes: bytes, metadata: ModelMetadata, path: os.p
 
     :param model_bytes: The model to save, as a bytes string
     :param metadata: The metadata of the model to save
-    :param path: The path to save the model to save
+    :param path: The path to save the model to
     """
     os.makedirs(path, exist_ok=True)
     _save_model_metadata(metadata, path)
-    model_path = get_model_path(path, metadata.model_id)
+    model_path = get_model_tflite_path(path, metadata.model_id)
     with open(model_path, 'wb') as f:
         f.write(model_bytes)
 
 
-def load_model_from_tflite(model_dir: str) -> PredictionModel:
+def load_model_tflite(model_dir: str) -> PredictionModel:
     if not os.path.isdir(model_dir):
         raise NotADirectoryError(f'Model directory {model_dir} does not exist')
     metadata = _load_model_metadata(model_dir)
-    path = get_model_path(model_dir, metadata.model_id)
+    path = get_model_tflite_path(model_dir, metadata.model_id)
     model = LiteModel.from_tflite_file(path, metadata)
     return model
 
@@ -111,7 +111,29 @@ def clone_model(model: Model) -> Model:
     return Model(clone, metadata)
 
 
-def get_model_path(model_dir: str, model_name: str):
-    file_name = f'{model_name}.tflite'
+def get_model_tflite_path(model_dir: str, model_name: str):
+    """
+    Returns the full path of a model's .tflite file.
+
+    :param model_dir: The directory containing the model's files
+    :param model_name: The name of the model
+    :return: The full path of the model's .tflite file, as a string
+    """
+    file_name = _get_model_tflite_file_name(model_name)
     model_path = os.path.join(model_dir, file_name)
     return model_path
+
+
+def _get_model_tflite_file_name(model_name: str) -> str:
+    return f'{model_name}.tflite'
+
+
+def get_model_dir_path(models_root_folder: str, model_name: str):
+    """
+    Returns the path of the directory containing the model's files.
+
+    :param models_root_folder: The 'root model folder', i.e., the folder containing all the models
+    :param model_name: The unique name of the model
+    :return: The full path of the model's folder, as a string
+    """
+    return os.path.join(models_root_folder, model_name)

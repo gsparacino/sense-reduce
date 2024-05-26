@@ -1,36 +1,18 @@
 import os
 
-import pandas as pd
-
 from base import Config
 from base.model import Model, ModelID
-from base.model_trainer import DefaultModelTrainer
 from base.node_manager import NodeID
-from common import ModelMetadata
 from common.model_utils import clone_model, load_model_from_savemodel, save_model
 
 
-class ModelManager:
+class ModelPortfolio:
     def __init__(
             self,
             config: Config
     ):
-        self._model_trainer = DefaultModelTrainer(epochs=2)
         self._config = config
         self.base_model: Model = self._load_base_model(config)
-
-    def train_new_model(self, node_id: NodeID, model_metadata: ModelMetadata, data: pd.DataFrame = None) -> Model:
-        """
-        Trains a new model for the provided Node with the provided metadata, using the provided data as training set.
-
-        :param node_id: the ID of the node for which the model should be trained
-        :param model_metadata: the metadata of the new model
-        :param data: the training data
-        :return: the new Model
-        """
-        new_model = self._model_trainer.train_new_model(self.base_model.model, self.base_model.metadata, data)
-        self._save_model(node_id, new_model)
-        return new_model
 
     def clone_model(self, node_id: NodeID, model: Model) -> Model:
         """
@@ -41,7 +23,7 @@ class ModelManager:
         :return: the new model
         """
         model = clone_model(model)
-        self._save_model(node_id, model)
+        self.save_model(node_id, model)
         return model
 
     def load_model(self, model_id: ModelID, node_id: NodeID = None) -> Model:
@@ -59,7 +41,7 @@ class ModelManager:
     def get_model_file_path(self, model_id: ModelID, node_id: NodeID) -> os.path:
         return os.path.join(self._config.model_dir, node_id, model_id, f"{model_id}.tflite")
 
-    def _save_model(self, node_id: NodeID, model: Model) -> None:
+    def save_model(self, node_id: NodeID, model: Model) -> None:
         """
         Saves a model as a file in the base station's model directory.
 
@@ -70,5 +52,11 @@ class ModelManager:
         save_model(model, model_path)
 
     def _load_base_model(self, config: Config) -> Model:
+        """
+        Loads the cluster's default model.
+
+        :param config: The Base Station's configuration
+        :return: The base model
+        """
         model_id = config.base_model_id
         return self.load_model(model_id)

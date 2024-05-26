@@ -6,9 +6,10 @@ import pandas as pd
 
 from base import Config
 from base.model import Model, ModelID
-from base.model_manager import ModelManager
+from base.model_portfolio import ModelPortfolio
+from base.model_trainer import DefaultModelTrainer
 from base.node_manager import NodeManager, NodeID
-from common import ThresholdMetric
+from common import ThresholdMetric, ModelMetadata
 
 ClusterID = str
 
@@ -18,11 +19,12 @@ class ClusterManager:
     def __init__(self, config: Config):
         self._nodes: dict[NodeID, NodeManager] = {}
         self.config: Config = config
-        self.model_manager = ModelManager(config)
+        self._model_portfolio = ModelPortfolio(config)
+        self._model_trainer = DefaultModelTrainer(epochs=2)
         self._training_df: pd.DataFrame = pd.read_pickle(config.training_data_pickle_path)
 
     def add_node(self, node_id: NodeID, threshold_metric: ThresholdMetric, data: pd.DataFrame = None) -> None:
-        model = self.model_manager.clone_model(node_id, self.model_manager.base_model)
+        model = self._model_portfolio.clone_model(node_id, self._model_portfolio.base_model)
         node_manager = NodeManager(node_id, threshold_metric, model)
         if data is None:
             node_manager.add_measurements(self._training_df)
@@ -41,13 +43,28 @@ class ClusterManager:
         return self._get_node(node_id).model
 
     def get_model_file_path(self, node_id: NodeID, model_id: ModelID) -> os.path:
-        return self.model_manager.get_model_file_path(model_id, node_id)
+        return self._model_portfolio.get_model_file_path(model_id, node_id)
 
     def handle_new_model_request(self, node_id: NodeID) -> Optional[Model]:
         node_manager = self._get_node(node_id)
         measurements = node_manager.get_measurements()
         metadata = node_manager.model.metadata
-        new_model = self.model_manager.train_new_model(node_id, metadata, measurements)
+        new_model = self._train_new_model(node_id, metadata, measurements)
+        return new_model
+
+    def _train_new_model(self, node_id: NodeID, model_metadata: ModelMetadata, data: pd.DataFrame = None) -> Model:
+        """
+        Trains a new model for the provided Node with the provided metadata, using the provided data as training set.
+        The new model is then saved into the Cluster's portfolio.
+
+        :param node_id: the ID of the node for which the model should be trained
+        :param model_metadata: the metadata of the new model
+        :param data: the training data
+        :return: the new Model
+        """
+        base_model: Model = self._model_portfolio.base_model
+        new_model = self._model_trainer.train_new_model(base_model.model, model_metadata, data)
+        self._model_portfolio.save_model(node_id, new_model)
         return new_model
 
     def _get_data(self, node_id: NodeID, start: datetime, end: datetime) -> pd.DataFrame:

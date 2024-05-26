@@ -6,16 +6,26 @@ from typing import Optional
 import numpy as np
 
 from common import ModelMetadata, PredictionModel, ThresholdMetric, Predictor
-from common.model_utils import save_model_as_tflite, load_model_from_tflite
+from common.model_utils import save_model_as_tflite, load_model_from_tflite, get_model_path, delete_tflite_model
+from sensor.base_station_gateway import BaseStationGateway
 
 
 class ModelManager:
     base_dir = os.path.abspath(os.path.dirname(__file__))
 
-    def __init__(self, model_dir: str) -> None:
+    def __init__(self, node_id: str, model_dir: str, base_station_gateway: BaseStationGateway):
+        """
+        Manages the Sensor's portfolio of PredictionModels.
+
+        :param node_id: The Sensor's unique ID.
+        :param model_dir: The local directory in which the models are stored.
+        :param base_station_gateway: A BaseStationGateway instance, used to interact with the Node's Base Station.
+        """
+        self.node_id = node_id
+        self._base_station = base_station_gateway
         self._model_dir = os.path.join(ModelManager.base_dir, model_dir)
         self._models: dict[str, PredictionModel] = {}
-        self._initialize_models()
+        self._load_local_models()
 
     def save_model(self, model_bytes: bytes, metadata: ModelMetadata) -> PredictionModel:
         """
@@ -31,14 +41,30 @@ class ModelManager:
         self._models[model_name] = model
         return model
 
-    def get_model_from_portfolio(self, model_name: str) -> Optional[PredictionModel]:
+    def get_model(self, metadata: ModelMetadata) -> Optional[PredictionModel]:
         """
         Retrieves a model from the Sensor's portfolio, if present; otherwise returns None.
 
-        :param model_name: The name of the model to load
+        :param metadata: The ModelMetadata of the Model to load
         :return: The PredictionModel, or None if the model is not found
         """
-        return self._models.get(model_name)
+        model_name = metadata.model_id
+        model = self._models.get(model_name)
+        if model is None:
+            model_bytes: bytes = self._base_station.fetch_model_file(self.node_id, model_name)
+            model = self.save_model(model_bytes, metadata)
+        return model
+
+    def delete_model(self, model_name: str) -> None:
+        """
+        Removes a Model from the Sensor's portfolio, if present.
+
+        :param model_name: The name of the model to delete
+        """
+        model_to_delete = self._models.pop(model_name)
+        if model_to_delete:
+            path = get_model_path(self._model_dir, model_name)
+            delete_tflite_model(path)
 
     def get_new_predictor(self, threshold_metric: ThresholdMetric,
                           current_predictor: Predictor,
@@ -73,7 +99,7 @@ class ModelManager:
 
         return best_predictor
 
-    def _initialize_models(self) -> None:
+    def _load_local_models(self) -> None:
         """
         Initializes the Sensor's models portfolio by loading all TFLite models in its storage.
         """

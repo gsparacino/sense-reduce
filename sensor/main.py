@@ -15,8 +15,6 @@ from sensor.sensor_manager import SensorManager
 
 logging.basicConfig(level=logging.DEBUG)
 
-model_manager = ModelManager('models')  # TODO: make the model's path configurable
-
 
 def run(threshold_metric: ThresholdMetric,
         base_address: str,
@@ -51,6 +49,7 @@ def run(threshold_metric: ThresholdMetric,
                  )
     base_station = BaseStationGateway(base_address)
     threshold_metric_to_dict = threshold_metric.to_dict()
+    model_manager = ModelManager(NODE_ID, 'models', base_station)  # TODO: make the model's path configurable
 
     if data_reduction_mode == 'none':
         # TODO: use NodeManager anyway
@@ -64,11 +63,12 @@ def run(threshold_metric: ThresholdMetric,
         model_metadata, data_storage = (
             base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_interval))
 
-        model = model_manager.get_model_from_portfolio(model_metadata.model_id)
-        if model is None:
-            model_bytes: bytes = base_station.fetch_model_file(NODE_ID, model_metadata.model_id)
-            model = model_manager.save_model(model_bytes, model_metadata)
+        model = model_manager.get_model(model_metadata)
+        # if model is None:
+        #     model_bytes: bytes = base_station.fetch_model_file(NODE_ID, model_metadata.model_id)
+        #     model = model_manager.save_model(model_bytes, model_metadata)
 
+        # TODO: move Predictor initialization into model_manager
         period = datetime.timedelta(seconds=prediction_interval)
         predictor = Predictor(model, data_storage, period)
         predictor.update_prediction_horizon(datetime.datetime.now())

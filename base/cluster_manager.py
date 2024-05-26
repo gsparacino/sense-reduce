@@ -37,7 +37,7 @@ class ClusterManager:
     def get_measurements(self, node_id: NodeID) -> pd.DataFrame:
         return self._get_node(node_id).get_measurements()
 
-    def get_current_model_of_node(self, node_id: NodeID) -> Model:
+    def get_current_model(self, node_id: NodeID) -> Model:
         return self._get_node(node_id).model
 
     def get_model_file_path(self, node_id: NodeID, model_id: ModelID) -> os.path:

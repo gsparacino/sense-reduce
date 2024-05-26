@@ -12,6 +12,11 @@ from common import DataStorage, ModelMetadata
 
 class BaseStationGateway:
     def __init__(self, base_address: str):
+        """
+        A façade class that abstracts away all communications with the Base Station.
+
+        :param base_address: The HTTP url of the Base Station.
+        """
         logging.debug(f"Initializing BaseStationGateway with base address: {base_address}")
         self.base_address = base_address
         response = requests.get(f'{self.base_address}/ping')

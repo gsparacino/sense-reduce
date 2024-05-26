@@ -23,12 +23,11 @@ def register_node(node_id: str):
     event_logger.log_event(LogEvent(node_id, LogEventType.REGISTRATION))
 
     cluster_manager.add_node(node_id, threshold_metric)
-    model = cluster_manager.get_current_model_of_node(node_id)
+    model = cluster_manager.get_current_model(node_id)
     initial_df = cluster_manager.get_measurements(node_id)
 
     payload = dict()
     payload['model_metadata'] = model.metadata.to_dict()
-    payload['model_id'] = model.model_id
     payload['initial_df'] = initial_df.to_json()
     logging.debug(f'Responding to new node with payload: {payload}')
     return payload
@@ -67,6 +66,7 @@ def post_update(node_id: str):
         measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
         cluster_manager.add_measurements(node_id, measurements)
     payload = dict()
+    payload['model_metadata'] = new_model.metadata.to_dict()
     # TODO add notifications (e.g. model switch events) to the response
     return payload
 

@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 from typing import Any
 
 import tensorflow as tf
@@ -84,10 +85,17 @@ def save_model_as_tflite(model_bytes: bytes, metadata: ModelMetadata, path: os.p
 
 
 def load_model_from_tflite(model_dir: str) -> PredictionModel:
+    if not os.path.isdir(model_dir):
+        raise NotADirectoryError(f'Model directory {model_dir} does not exist')
     metadata = _load_model_metadata(model_dir)
     path = get_model_path(model_dir, metadata.model_id)
     model = LiteModel.from_tflite_file(path, metadata)
     return model
+
+
+def delete_tflite_model(model_dir: str) -> None:
+    if os.path.isdir(model_dir):
+        shutil.rmtree(model_dir)
 
 
 def clone_model(model: Model) -> Model:

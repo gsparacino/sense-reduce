@@ -59,9 +59,9 @@ def get_model(node_id: str, model_id: str):
     return send_file(model_file_path)
 
 
-@app.post("/update/<string:node_id>")
-def post_update(node_id: str):
-    logging.info(f'Node {node_id} sent update')
+@app.post("/sync/<string:node_id>")
+def sync(node_id: str):
+    logging.info(f'Node {node_id} sent synchronization request')
     body = request.get_json(force=True)
     if body.get('measurements') is not None:
         measurements: pd.DataFrame = pd.read_json(body.get('measurements'))

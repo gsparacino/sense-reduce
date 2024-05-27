@@ -75,7 +75,7 @@ class ModelManager:
 
         :param models: The target list of models for the node
         """
-        current_models = set(model_id for model_id, model in self._models)
+        current_models = set(model_id for model_id in self._models.keys())
         expected_models = set(model.model_id for model in models)
 
         models_to_remove = current_models.difference(expected_models)

@@ -133,22 +133,24 @@ class BaseStationGateway:
 
         return r.content
 
-    def send_update(self,
+    def synchronize(self,
                     node_id: str,
                     dt: datetime.datetime,
                     measurements: pd.DataFrame
-                    ) -> Optional[ModelMetadata]:
+                    ) -> list[ModelMetadata]:
         """
-        Sends an update event to the Base Station, which may contain the latest measurements.
+        Synchronizes with the Base Station, sending the latest measurements (if appropriate)and fetching the list of
+        models available for the sensor.
 
         :param node_id: The node's unique ID.
-        :param dt: The timestamp at which the horizon update is necessary, as a datetime object.
+        :param dt: The timestamp of the synchronization, i.e. the timestamp at which the latest measurement was read,
+        as a datetime object.
         :param measurements: The (reduced) measurements that occurred in the current prediction horizon, as a NumPy array.
 
-        :return: If the Base Station requires the node to switch model, a common.ModelMetadata containing the metadata
-        of the new model; otherwise None is returned.
+        :return: A list of common.ModelMetadata, containing the metadata of the models that the sensor could fetch from
+        the base station.
 
-        :raises requests.RequestException: An error occurred while sending the update.
+        :raises requests.RequestException: An error occurred while sending the request.
         """
         body = {
             'timestamp': dt.isoformat(),
@@ -156,11 +158,11 @@ class BaseStationGateway:
         }
         logging.debug(f'Node {node_id} sending horizon update: {body}')
 
-        response = requests.post(f'{self.base_address}/update/{node_id}', json=body)
+        response = requests.post(f'{self.base_address}/sync/{node_id}', json=body)
         if not response.ok:
-            raise RequestException(f'POST {self.base_address}/update/{node_id}  returned {response.status_code}')
+            raise RequestException(f'POST {self.base_address}/sync/{node_id}  returned {response.status_code}')
 
-        return self._extract_model_metadata(response)
+        return self._extract_models_portfolio(response)
 
     def request_new_model(self, node_id: str, dt: datetime.datetime, data: pd.DataFrame) -> Optional[ModelMetadata]:
         body = {

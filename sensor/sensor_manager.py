@@ -78,7 +78,11 @@ class SensorManager:
             self.predictor.add_measurement(timestamp, measurements_array)
 
             if self._operating_mode == SensorManager.OperatingMode.DATA_REDUCTION:
-                prediction = self._get_prediction(measurements_array, timestamp)
+                self.predictor.add_measurement(timestamp, measurements_array)
+                if not self.predictor.in_prediction_horizon(timestamp):
+                    self._synchronize(timestamp)
+                    self.predictor.update_prediction_horizon(timestamp)
+                prediction = self._get_prediction(timestamp)
                 logging.debug(f"Prediction by {self.predictor.model_id} @ {timestamp}: {prediction.values}")
 
                 prediction_array = prediction.to_numpy()
@@ -120,19 +124,23 @@ class SensorManager:
 
             time.sleep(time_interval)
 
-    def _get_prediction(self, measurements_array, timestamp):
+    def _get_prediction(self, timestamp: datetime.datetime):
         predictor = self.predictor
-        node_id = self.node_id
-        base_station = self.base_station_gateway
-
-        predictor.add_measurement(timestamp, measurements_array)
-        if not predictor.in_prediction_horizon(timestamp):
-            latest_measurements = predictor.get_measurements_in_current_prediction_horizon(timestamp)
-            base_station.send_update(node_id, timestamp, latest_measurements)
-            predictor.update_prediction_horizon(timestamp)
         prediction = predictor.get_prediction_at(timestamp)
         predictor.add_prediction(timestamp, prediction.to_numpy())
         return prediction
+
+    def _synchronize(self, timestamp: datetime.datetime):
+        """
+        Synchronizes with the base station state by sending the latest measurements, and fetching or deleting local
+        models to reflect the current state of the models' portfolio on the Base Station.
+
+        :param timestamp: The timestamp of the synchronization, as a datetime.datetime.
+        """
+        predictor = self.predictor
+        latest_measurements = predictor.get_measurements_in_current_prediction_horizon(timestamp)
+        models = self.base_station_gateway.synchronize(self.node_id, timestamp, latest_measurements)
+        self.model_manager.synchronize_models(models)
 
     def _get_measurement(self) -> (pd.Series, datetime):
         now = datetime.datetime.now()

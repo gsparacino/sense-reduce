@@ -19,8 +19,8 @@ class ModelPortfolio:
     ):
         self._model_dir = config.model_dir
         self._models: Dict[ModelID, Model] = {}
-        self.base_model: Model = self._load_model(config.base_model_id)
         self._load_local_models()
+        self.base_model: Model = self.load_model(config.base_model_id)
 
     # def clone_model(self, model: Model) -> Model:
     #     """

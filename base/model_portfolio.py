@@ -1,4 +1,5 @@
 import os
+from typing import Dict
 
 from base import Config
 from base.model import Model, ModelID
@@ -7,12 +8,20 @@ from common.model_utils import clone_model, load_model_from_savemodel, save_mode
 
 
 class ModelPortfolio:
+
+    # TODO: implement centralized Portfolio management for all SNs in the cluster. BS responsibilities: train models,
+    #  manage portfolio by adding/removing models, keep SNs up to date with the latest changes to the portfolio
+
+    # TODO: pre-load models trained in the past and stored in the BS, as they might still be useful
+
     def __init__(
             self,
             config: Config
     ):
-        self._config = config
-        self.base_model: Model = self._load_base_model(config)
+        self._model_dir = config.model_dir
+        self._models: Dict[str, Model] = {}
+        self.base_model: Model = self.load_model(config.base_model_id)
+        self._load_local_models()
 
     def clone_model(self, model: Model) -> Model:
         """
@@ -32,28 +41,32 @@ class ModelPortfolio:
         :param model_id: the ID of the model to load
         :return: the loaded model
         """
-        model_path = os.path.join(self._config.model_dir, model_id)
-        return load_model_from_savemodel(model_path)
+        model = self._models.get(model_id)
+        if model is None:
+            model_path = os.path.join(self._model_dir, model_id)
+            model = load_model_from_savemodel(model_path)
+            self._models[model_id] = model
+        return model
 
     def get_model_tflite_file_path(self, model_id: ModelID) -> os.path:
-        path = get_model_dir_path(self._config.model_dir, model_id)
+        path = get_model_dir_path(self._model_dir, model_id)
         return get_model_tflite_path(path, model_id)
 
-    def save_model(self, model: Model) -> None:
+    def save_model(self, model: Model) -> Model:
         """
         Saves a model as a file in the base station's model directory.
 
         :param model: the model to save
         """
-        path = get_model_dir_path(self._config.model_dir, model.model_id)
+        model_id = model.model_id
+        path = get_model_dir_path(self._model_dir, model_id)
         save_model(model, path)
-
-    def _load_base_model(self, config: Config) -> Model:
-        """
-        Loads the cluster's default model.
-
-        :param config: The Base Station's configuration
-        :return: The base model
-        """
-        model_id = config.base_model_id
         return self.load_model(model_id)
+
+    def _load_local_models(self) -> None:
+        """
+        Initializes the Sensor's models portfolio by loading all TFLite models in its storage.
+        """
+        for item in os.scandir(self._model_dir):
+            if item.is_dir():
+                self.load_model(item.name)

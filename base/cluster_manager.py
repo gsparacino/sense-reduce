@@ -18,7 +18,6 @@ class ClusterManager:
 
     def __init__(self, config: Config):
         self._nodes: dict[NodeID, NodeManager] = {}
-        self.config: Config = config
         self._model_portfolio = ModelPortfolio(config)
         self._model_trainer = DefaultModelTrainer(epochs=2)
         self._training_df: pd.DataFrame = pd.read_pickle(config.training_data_pickle_path)

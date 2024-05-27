@@ -78,9 +78,8 @@ class SensorManager:
             self.predictor.add_measurement(timestamp, measurements_array)
 
             if self._operating_mode == SensorManager.OperatingMode.DATA_REDUCTION:
-                self.predictor.add_measurement(timestamp, measurements_array)
                 if not self.predictor.in_prediction_horizon(timestamp):
-                    self._synchronize(timestamp)
+                    self._synchronize_with_base_station(timestamp)
                     self.predictor.update_prediction_horizon(timestamp)
                 prediction = self._get_prediction(timestamp)
                 logging.debug(f"Prediction by {self.predictor.model_id} @ {timestamp}: {prediction.values}")
@@ -96,13 +95,13 @@ class SensorManager:
                         logging.info(
                             f"Threshold violation: Measurement={measurement.values}, Prediction={prediction.values}"
                         )
-                        new_predictor = self.model_manager.get_new_predictor(
+                        new_data = self.predictor.get_measurements_in_current_prediction_horizon(timestamp)
+                        models = base_station.send_violation(node_id, timestamp, new_data)
+                        self.model_manager.synchronize_models(models)
+                        new_predictor = self.model_manager.get_better_predictor(
                             threshold_metric, self.predictor, timestamp, measurements_array, prediction
                         )
-                        if new_predictor is None:
-                            self._operating_mode = SensorManager.OperatingMode.MODEL_TRAINING
-                            logging.debug(f"Switching to operating mode: {self._operating_mode.name}")
-                        else:
+                        if new_predictor is not None:
                             self.predictor = new_predictor
                             logging.debug(f"Switching to new model: {new_predictor.model_id}")
                     else:
@@ -110,17 +109,6 @@ class SensorManager:
                             f"Threshold violation within the cooldown period, ignoring violations until "
                             f"{self._latest_violation_timestamp + cooldown}"
                         )
-
-            if self._operating_mode == SensorManager.OperatingMode.MODEL_TRAINING:
-                new_data = self.predictor.get_measurements_in_current_prediction_horizon(timestamp)
-                new_model_metadata = base_station.request_new_model(node_id, timestamp, new_data)
-                if new_model_metadata is not None:
-                    logging.debug(f"Base Station provided a new model {new_model_metadata.model_id}")
-                    model = self.model_manager.add_model(new_model_metadata)
-                    self.predictor = Predictor(model, self.predictor.data, self.predictor.get_prediction_timedelta())
-                    self._operating_mode = SensorManager.OperatingMode.DATA_REDUCTION
-                    logging.debug(f"Switching to operating mode {self._operating_mode.name}")
-                self.predictor.update_prediction_horizon(timestamp)
 
             time.sleep(time_interval)
 
@@ -130,7 +118,7 @@ class SensorManager:
         predictor.add_prediction(timestamp, prediction.to_numpy())
         return prediction
 
-    def _synchronize(self, timestamp: datetime.datetime):
+    def _synchronize_with_base_station(self, timestamp: datetime.datetime):
         """
         Synchronizes with the base station state by sending the latest measurements, and fetching or deleting local
         models to reflect the current state of the models' portfolio on the Base Station.

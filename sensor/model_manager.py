@@ -1,5 +1,4 @@
 import datetime
-import logging
 import os
 from typing import Optional
 
@@ -7,7 +6,7 @@ import numpy as np
 
 from common import ModelMetadata, PredictionModel, ThresholdMetric, Predictor
 from common.model_utils import save_model_as_tflite, load_model_tflite, delete_tflite_model, \
-    get_model_dir_path
+    get_model_dir_path, get_better_predictor
 from sensor.base_station_gateway import BaseStationGateway
 
 
@@ -97,11 +96,11 @@ class ModelManager:
             path = get_model_dir_path(self._model_dir, model_name)
             delete_tflite_model(path)
 
-    def get_new_predictor(self, threshold_metric: ThresholdMetric,
-                          current_predictor: Predictor,
-                          timestamp: datetime.datetime,
-                          measurements: np.array,
-                          prediction: np.array) -> Optional[Predictor]:
+    def get_better_predictor(self, threshold_metric: ThresholdMetric,
+                             current_predictor: Predictor,
+                             timestamp: datetime.datetime,
+                             measurements: np.array,
+                             prediction: np.array) -> Optional[Predictor]:
         """
         Iterates over the available PredictionModels, compares their performance on the latest measurements and returns
         a Predictor with the best model.
@@ -115,21 +114,10 @@ class ModelManager:
         :return: a Predictor with the best possible PredictionModel according to the threshold_metric, or None if none
         of the models has better performances than the current one.
         """
-        best_score = threshold_metric.threshold_score(measurements, prediction)
-        best_predictor = None
-        for model_name, model in self._models.items():
-            if model_name == current_predictor.model_id:
-                continue
-            predictor = Predictor(model, current_predictor.data, current_predictor.prediction_period)
-            predictor.update_prediction_horizon(timestamp)
-            prediction = predictor.get_prediction_at(timestamp).to_numpy()
-            score = threshold_metric.threshold_score(measurements, prediction)
-            logging.debug(f"{predictor.model_id} score: {best_score}")
-            if score < best_score:
-                best_score = score
-                best_predictor = predictor
-                logging.debug(f"New best model: {predictor.model_id}")
-
+        models = list(self._models.values())
+        best_predictor = get_better_predictor(
+            models, threshold_metric, current_predictor, timestamp, measurements, prediction
+        )
         return best_predictor
 
     def _load_local_models(self) -> None:

@@ -51,6 +51,19 @@ def post_new_model_request(node_id: str):
     return payload
 
 
+@app.post("/violation/<string:node_id>")
+def post_violation(node_id: str):
+    logging.info(f'Node {node_id} sent a violation notification')
+    body = request.get_json(force=True)
+    if body.get('measurements') is not None:
+        measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
+        cluster_manager.add_measurements(node_id, measurements)
+        cluster_manager.handle_new_model_request(node_id)
+    payload = dict()
+    payload['portfolio'] = list(model.to_dict() for model in cluster_manager.get_models_in_portfolio())
+    return payload
+
+
 @app.get("/models/<string:node_id>/<string:model_id>")
 def get_model(node_id: str, model_id: str):
     logging.info(f'Node {node_id} requested model {model_id}')

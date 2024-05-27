@@ -83,38 +83,38 @@ class BaseStationGateway:
         if not response.ok:
             raise RequestException(f'POST {self.base_address}/measurement/{node_id} returned {response.status_code}')
 
-    def send_violation(self,
-                       node_id: str,
-                       dt: datetime.datetime,
-                       measurement: np.ndarray,
-                       latest_data: pd.DataFrame,
-                       ) -> Optional[ModelMetadata]:
-        """
-        Sends a violation message to the Base Station, containing the timestamp of the violation, the measurement that
-        triggered it, and the data required for updating the prediction horizon.
-
-        :param node_id: The node's unique ID.
-        :param dt: The measurement's timestamp, as a datetime object.
-        :param measurement: The measurement that triggered the violation, as a NumPy array.
-        :param latest_data: The latest measurements gathered by the node, as a pandas DataFrame.
-
-        :return: If the Base Station requires the node to switch model, a common.ModelMetadata containing the metadata
-        of the new model; otherwise None is returned.
-
-        :raises requests.RequestException: An error occurred while sending the violation.
-        """
-        body = {
-            'timestamp': dt.isoformat(),
-            'measurement': list(measurement),
-            'data': latest_data.to_json(),
-        }
-        logging.debug(f'Node {node_id} handling violation by sending: {body}')
-
-        response = requests.post(f'{self.base_address}/violation/{node_id}', json=body)
-        if not response.ok:
-            raise RequestException(f'POST {self.base_address}/violation/{node_id} returned {response.status_code}')
-
-        return self._extract_model_metadata(response)
+    # def send_violation(self,
+    #                    node_id: str,
+    #                    dt: datetime.datetime,
+    #                    measurement: np.ndarray,
+    #                    latest_data: pd.DataFrame,
+    #                    ) -> Optional[ModelMetadata]:
+    #     """
+    #     Sends a violation message to the Base Station, containing the timestamp of the violation, the measurement that
+    #     triggered it, and the data required for updating the prediction horizon.
+    #
+    #     :param node_id: The node's unique ID.
+    #     :param dt: The measurement's timestamp, as a datetime object.
+    #     :param measurement: The measurement that triggered the violation, as a NumPy array.
+    #     :param latest_data: The latest measurements gathered by the node, as a pandas DataFrame.
+    #
+    #     :return: If the Base Station requires the node to switch model, a common.ModelMetadata containing the metadata
+    #     of the new model; otherwise None is returned.
+    #
+    #     :raises requests.RequestException: An error occurred while sending the violation.
+    #     """
+    #     body = {
+    #         'timestamp': dt.isoformat(),
+    #         'measurement': list(measurement),
+    #         'data': latest_data.to_json(),
+    #     }
+    #     logging.debug(f'Node {node_id} handling violation by sending: {body}')
+    #
+    #     response = requests.post(f'{self.base_address}/violation/{node_id}', json=body)
+    #     if not response.ok:
+    #         raise RequestException(f'POST {self.base_address}/violation/{node_id} returned {response.status_code}')
+    #
+    #     return self._extract_model_metadata(response)
 
     def fetch_model_bytes(self, node_id: str, model_id: str) -> bytes:
         """Fetches a specific prediction model from the Base Station.
@@ -156,7 +156,7 @@ class BaseStationGateway:
             'timestamp': dt.isoformat(),
             'measurements': measurements.to_json(),
         }
-        logging.debug(f'Node {node_id} sending horizon update: {body}')
+        logging.debug(f'Synchronization event: {body}')
 
         response = requests.post(f'{self.base_address}/sync/{node_id}', json=body)
         if not response.ok:
@@ -175,6 +175,18 @@ class BaseStationGateway:
             raise RequestException(f'POST {self.base_address}/models/{node_id}/new returned {response.status_code}')
 
         return self._extract_model_metadata(response)
+
+    def send_violation(self, node_id: str, dt: datetime.datetime, data: pd.DataFrame) -> list[ModelMetadata]:
+        body = {
+            'timestamp': dt.isoformat(),
+            'measurements': data.to_json(),
+        }
+        logging.debug(f'Violation event: {body}')
+        response = requests.post(f'{self.base_address}/violation/{node_id}', json=body)
+        if not response.ok:
+            raise RequestException(f'POST {self.base_address}/violation/{node_id} returned {response.status_code}')
+
+        return self._extract_models_portfolio(response)
 
     @staticmethod
     def _extract_model_metadata(response: Response) -> Optional[ModelMetadata]:

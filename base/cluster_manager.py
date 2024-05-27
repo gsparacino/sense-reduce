@@ -1,6 +1,5 @@
 import os
 from datetime import datetime
-from typing import Optional
 
 import pandas as pd
 
@@ -47,12 +46,12 @@ class ClusterManager:
     def get_model_upload_path(self, model_id: ModelID) -> os.path:
         return self._model_portfolio.get_model_tflite_file_path(model_id)
 
-    def handle_new_model_request(self, node_id: NodeID) -> Optional[Model]:
+    def handle_new_model_request(self, node_id: NodeID) -> None:
         node_manager = self._get_node(node_id)
         measurements = node_manager.get_measurements()
         metadata = node_manager.model.metadata
-        new_model = self._train_new_model(metadata, measurements)
-        return new_model
+        # TODO: train new model in a dedicated thread
+        self._train_new_model(metadata, measurements)
 
     def _train_new_model(self, model_metadata: ModelMetadata, data: pd.DataFrame = None) -> Model:
         """

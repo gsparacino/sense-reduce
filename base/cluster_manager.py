@@ -41,6 +41,9 @@ class ClusterManager:
     def get_current_model(self, node_id: NodeID) -> Model:
         return self._get_node(node_id).model
 
+    def get_models_in_portfolio(self) -> list[ModelMetadata]:
+        return self._model_portfolio.get_available_models()
+
     def get_model_upload_path(self, model_id: ModelID) -> os.path:
         return self._model_portfolio.get_model_tflite_file_path(model_id)
 

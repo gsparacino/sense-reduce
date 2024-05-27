@@ -60,15 +60,13 @@ def run(threshold_metric: ThresholdMetric,
             time.sleep(time_interval)
 
     elif data_reduction_mode == 'predict':
-        model_metadata, data_storage = (
-            base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_interval))
+        node_initialization = base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_interval)
+        model_manager.synchronize_models(node_initialization.portfolio)
+        current_model = model_manager.get_model(node_initialization.current_model)
 
         # TODO: move Predictor initialization into sensor_manager
-        model = model_manager.get_model(model_metadata)
-        if model is None:
-            model = model_manager.add_model(model_metadata)
         period = datetime.timedelta(seconds=prediction_interval)
-        predictor = Predictor(model, data_storage, period)
+        predictor = Predictor(current_model, node_initialization.initial_data, period)
         predictor.update_prediction_horizon(datetime.datetime.now())
 
         sensor_manager = SensorManager(NODE_ID, sensor, predictor, base_station, model_manager,

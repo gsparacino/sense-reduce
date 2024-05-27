@@ -62,9 +62,29 @@ class ModelManager:
         :return: The new PredictionModel
         """
         model_name = metadata.model_id
-        model_bytes: bytes = self._base_station.fetch_model_file(self.node_id, model_name)
-        model = self._save_model(model_bytes, metadata)
+        model = self._models.get(model_name)
+        if model is None:
+            model_bytes: bytes = self._base_station.fetch_model_bytes(self.node_id, model_name)
+            model = self._save_model(model_bytes, metadata)
         return model
+
+    def synchronize_models(self, models: list[ModelMetadata]) -> None:
+        """
+        Updates the list of Sensor's models by removing local models that are not present in the provided list, and
+        adding those models that are present in the provided list but not in the Sensor's portfolio.
+
+        :param models: The target list of models for the node
+        """
+        current_models = set(model_id for model_id, model in self._models)
+        expected_models = set(model.model_id for model in models)
+
+        models_to_remove = current_models.difference(expected_models)
+        for model_id in models_to_remove:
+            self._delete_model(model_id)
+        models_to_add = expected_models.difference(current_models)
+        for model_id in models_to_add:
+            model_metadata = [metadata for metadata in models if metadata.model_id == model_id].pop(0)
+            self.add_model(model_metadata)
 
     def _delete_model(self, model_name: str) -> None:
         """

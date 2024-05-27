@@ -10,6 +10,13 @@ from requests import RequestException, Response
 from common import DataStorage, ModelMetadata
 
 
+class NodeInitialization:
+    def __init__(self, current_model: ModelMetadata, initial_data: DataStorage, portfolio: list[ModelMetadata]):
+        self.current_model: ModelMetadata = current_model
+        self.initial_data: DataStorage = initial_data
+        self.portfolio: list[ModelMetadata] = portfolio
+
+
 class BaseStationGateway:
     def __init__(self, base_address: str):
         """
@@ -28,7 +35,7 @@ class BaseStationGateway:
     def register_node(self,
                       node_id: str,
                       threshold_metric: dict,
-                      frequency: float) -> (ModelMetadata, DataStorage):  # TODO: return object instead of Tuple
+                      frequency: float) -> NodeInitialization:
         """
         Registers the sensor node with the base station by providing its ID and threshold metric. The Base Station may
         respond with the metadata of the model to fetch.
@@ -53,8 +60,9 @@ class BaseStationGateway:
 
         model_metadata = self._extract_model_metadata(response)
         initial_df = self._extract_initial_df(response, model_metadata)
+        portfolio = self._extract_models_portfolio(response)
 
-        return model_metadata, initial_df
+        return NodeInitialization(model_metadata, initial_df, portfolio)
 
     def send_measurement(self, node_id: str, dt: datetime.datetime, measurement: np.ndarray) -> None:
         """
@@ -108,7 +116,7 @@ class BaseStationGateway:
 
         return self._extract_model_metadata(response)
 
-    def fetch_model_file(self, node_id: str, model_id: str) -> bytes:
+    def fetch_model_bytes(self, node_id: str, model_id: str) -> bytes:
         """Fetches a specific prediction model from the Base Station.
 
         :param node_id: ID of the sensor node, as a string.
@@ -180,6 +188,17 @@ class BaseStationGateway:
             return ModelMetadata.from_dict(new_model_metadata)
         else:
             return None
+
+    @staticmethod
+    def _extract_models_portfolio(response: Response) -> list[ModelMetadata]:
+        models = []
+        body = response.json()
+        portfolio: list = body.get('portfolio')
+        if portfolio is not None:
+            for model in portfolio:
+                models.append(ModelMetadata.from_dict(model))
+
+        return models
 
     @staticmethod
     def _extract_initial_df(response: Response, metadata: ModelMetadata) -> Optional[DataStorage]:

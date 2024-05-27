@@ -1,9 +1,10 @@
 import os
-from typing import Dict
+from typing import Dict, List
 
 from base import Config
 from base.model import Model, ModelID
-from common.model_utils import clone_model, load_model_from_savemodel, save_model, get_model_tflite_path, \
+from common import ModelMetadata
+from common.model_utils import load_model_from_savemodel, save_model, get_model_tflite_path, \
     get_model_dir_path
 
 
@@ -12,27 +13,28 @@ class ModelPortfolio:
     # TODO: implement centralized Portfolio management for all SNs in the cluster. BS responsibilities: train models,
     #  manage portfolio by adding/removing models, keep SNs up to date with the latest changes to the portfolio
 
-    # TODO: pre-load models trained in the past and stored in the BS, as they might still be useful
-
     def __init__(
             self,
             config: Config
     ):
         self._model_dir = config.model_dir
-        self._models: Dict[str, Model] = {}
-        self.base_model: Model = self.load_model(config.base_model_id)
+        self._models: Dict[ModelID, Model] = {}
+        self.base_model: Model = self._load_model(config.base_model_id)
         self._load_local_models()
 
-    def clone_model(self, model: Model) -> Model:
-        """
-        Clones a model for the provided Node, using the provided model's metadata.
-
-        :param model: the model to clone
-        :return: the new model
-        """
-        model = clone_model(model)
-        self.save_model(model)
-        return model
+    # def clone_model(self, model: Model) -> Model:
+    #     """
+    #     Clones a model for the provided Node, using the provided model's metadata.
+    #
+    #     :param model: the model to clone
+    #     :return: the new model
+    #     """
+    #     model = clone_model(model)
+    #     self.save_model(model)
+    #     return model
+    def get_available_models(self) -> List[ModelMetadata]:
+        models: List[ModelMetadata] = list(model.metadata for _, model in self._models.items())
+        return models
 
     def load_model(self, model_id: ModelID) -> Model:
         """
@@ -43,9 +45,13 @@ class ModelPortfolio:
         """
         model = self._models.get(model_id)
         if model is None:
-            model_path = os.path.join(self._model_dir, model_id)
-            model = load_model_from_savemodel(model_path)
+            model = self._load_model(model_id)
             self._models[model_id] = model
+        return model
+
+    def _load_model(self, model_id: ModelID) -> Model:
+        model_path = os.path.join(self._model_dir, model_id)
+        model = load_model_from_savemodel(model_path)
         return model
 
     def get_model_tflite_file_path(self, model_id: ModelID) -> os.path:

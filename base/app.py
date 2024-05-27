@@ -29,6 +29,7 @@ def register_node(node_id: str):
     payload = dict()
     payload['model_metadata'] = model.metadata.to_dict()
     payload['initial_df'] = initial_df.to_json()
+    payload['portfolio'] = list(model.to_dict() for model in cluster_manager.get_models_in_portfolio())
     logging.debug(f'Responding to new node with payload: {payload}')
     return payload
 

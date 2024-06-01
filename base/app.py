@@ -29,7 +29,7 @@ def register_node(node_id: str):
     payload = dict()
     payload['model_metadata'] = model.metadata.to_dict()
     payload['initial_df'] = initial_df.to_json()
-    payload['portfolio'] = list(model.to_dict() for model in cluster_manager.get_models_in_portfolio())
+    payload['portfolio'] = cluster_manager.get_models_in_portfolio()
     logging.debug(f'Responding to new node with payload: {payload}')
     return payload
 
@@ -60,7 +60,7 @@ def post_violation(node_id: str):
         cluster_manager.add_measurements(node_id, measurements)
         cluster_manager.handle_new_model_request(node_id)
     payload = dict()
-    payload['portfolio'] = list(model.to_dict() for model in cluster_manager.get_models_in_portfolio())
+    payload['portfolio'] = cluster_manager.get_models_in_portfolio()
     return payload
 
 
@@ -72,6 +72,13 @@ def get_model(node_id: str, model_id: str):
     return send_file(model_file_path)
 
 
+@app.get("/models/<string:node_id>/<string:model_id>/metadata")
+def get_model_metadata(node_id: str, model_id: str):
+    logging.info(f'Node {node_id} requested model {model_id}')
+    metadata = cluster_manager.get_model_metadata(model_id)
+    return metadata.to_dict()
+
+
 @app.post("/sync/<string:node_id>")
 def sync(node_id: str):
     logging.info(f'Node {node_id} sent synchronization request')
@@ -80,7 +87,7 @@ def sync(node_id: str):
         measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
         cluster_manager.add_measurements(node_id, measurements)
     payload = dict()
-    # TODO add notifications (e.g. model switch events) to the response
+    payload['portfolio'] = cluster_manager.get_models_in_portfolio()
     return payload
 
 

@@ -11,10 +11,10 @@ from common import DataStorage, ModelMetadata
 
 
 class NodeInitialization:
-    def __init__(self, current_model: ModelMetadata, initial_data: DataStorage, portfolio: list[ModelMetadata]):
+    def __init__(self, current_model: ModelMetadata, initial_data: DataStorage, portfolio: list[str]):
         self.current_model: ModelMetadata = current_model
         self.initial_data: DataStorage = initial_data
-        self.portfolio: list[ModelMetadata] = portfolio
+        self.portfolio: list[str] = portfolio
 
 
 class BaseStationGateway:
@@ -133,11 +133,32 @@ class BaseStationGateway:
 
         return r.content
 
+    def fetch_model_metadata(self, node_id: str, model_id: str) -> ModelMetadata:
+        """Fetches a specific prediction model's metadata from the Base Station.
+
+        :param node_id: ID of the sensor node, as a string.
+        :param model_id: ID of the model to fetch, as a string.
+
+        :return: The ModelMetadata of the model.
+
+        :raises requests.RequestException: An error occurred while fetching the model.
+        """
+        logging.debug(f'Fetching model {model_id} metadata from Base Station')
+        r = requests.get(f'{self.base_address}/models/{node_id}/{model_id}/metadata')
+        if not r.ok:
+            raise RequestException(
+                f'GET {self.base_address}/models/{node_id}/{model_id}/metadata returned {r.status_code}'
+            )
+
+        metadata = ModelMetadata.from_dict(r.json())
+
+        return metadata
+
     def synchronize(self,
                     node_id: str,
                     dt: datetime.datetime,
                     measurements: pd.DataFrame
-                    ) -> list[ModelMetadata]:
+                    ) -> Optional[list[str]]:
         """
         Synchronizes with the Base Station, sending the latest measurements (if appropriate)and fetching the list of
         models available for the sensor.
@@ -176,7 +197,7 @@ class BaseStationGateway:
 
         return self._extract_model_metadata(response)
 
-    def send_violation(self, node_id: str, dt: datetime.datetime, data: pd.DataFrame) -> list[ModelMetadata]:
+    def send_violation(self, node_id: str, dt: datetime.datetime, data: pd.DataFrame) -> list[str]:
         body = {
             'timestamp': dt.isoformat(),
             'measurements': data.to_json(),
@@ -204,15 +225,13 @@ class BaseStationGateway:
             return None
 
     @staticmethod
-    def _extract_models_portfolio(response: Response) -> list[ModelMetadata]:
-        models = []
+    def _extract_models_portfolio(response: Response) -> Optional[list[str]]:
         body = response.json()
         portfolio: list = body.get('portfolio')
         if portfolio is not None:
-            for model in portfolio:
-                models.append(ModelMetadata.from_dict(model))
+            return portfolio
 
-        return models
+        return None
 
     @staticmethod
     def _extract_initial_df(response: Response, metadata: ModelMetadata) -> Optional[DataStorage]:

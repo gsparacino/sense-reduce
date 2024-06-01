@@ -10,9 +10,6 @@ from common.model_utils import load_model_from_savemodel, save_model, get_model_
 
 class ModelPortfolio:
 
-    # TODO: implement centralized Portfolio management for all SNs in the cluster. BS responsibilities: train models,
-    #  manage portfolio by adding/removing models, keep SNs up to date with the latest changes to the portfolio
-
     def __init__(
             self,
             config: Config
@@ -20,7 +17,7 @@ class ModelPortfolio:
         self._model_dir = config.model_dir
         self._models: Dict[ModelID, Model] = {}
         self._load_local_models()
-        self.base_model: Model = self.load_model(config.base_model_id)
+        self.base_model: Model = self.get_model(config.base_model_id)
 
     # def clone_model(self, model: Model) -> Model:
     #     """
@@ -32,20 +29,25 @@ class ModelPortfolio:
     #     model = clone_model(model)
     #     self.save_model(model)
     #     return model
-    def get_available_models(self) -> List[ModelMetadata]:
-        models: List[ModelMetadata] = list(model.metadata for _, model in self._models.items())
+    def get_available_models(self) -> List[ModelID]:
+        models: List[ModelMetadata] = list(model.model_id for _, model in self._models.items())
         return models
 
-    def load_model(self, model_id: ModelID) -> Model:
+    def get_model(self, model_id: ModelID) -> Model:
         """
-        Loads the model with the provided ID for the provided Node
-        '
-        :param model_id: the ID of the model to load
-        :return: the loaded model
+        Returns the model with the provided ModelID
+
+        :param model_id: The ID of the model
+
+        :return: The requested model
+
+        :raises ValueError: if the provided ModelID does not match any model
         """
         model = self._models.get(model_id)
         if model is None:
             model = self._load_model(model_id)
+            if model is None:
+                raise ValueError(f'Model {model_id} not found')
             self._models[model_id] = model
         return model
 
@@ -67,7 +69,7 @@ class ModelPortfolio:
         model_id = model.model_id
         path = get_model_dir_path(self._model_dir, model_id)
         save_model(model, path)
-        return self.load_model(model_id)
+        return self.get_model(model_id)
 
     def _load_local_models(self) -> None:
         """
@@ -75,4 +77,4 @@ class ModelPortfolio:
         """
         for item in os.scandir(self._model_dir):
             if item.is_dir():
-                self.load_model(item.name)
+                self.get_model(item.name)

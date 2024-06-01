@@ -95,8 +95,8 @@ class SensorManager:
                         logging.info(
                             f"Threshold violation: Measurement={measurement.values}, Prediction={prediction.values}"
                         )
-                        new_data = self.predictor.get_measurements_in_current_prediction_horizon(timestamp)
-                        models = base_station.send_violation(node_id, timestamp, new_data)
+                        violation_measurement = self.predictor.get_measurement(timestamp)
+                        models = base_station.send_violation(node_id, timestamp, violation_measurement)
                         self.model_manager.synchronize_models(models)
                         new_predictor = self.model_manager.get_better_predictor(
                             threshold_metric, self.predictor, timestamp, measurements_array, prediction
@@ -104,6 +104,16 @@ class SensorManager:
                         if new_predictor is not None:
                             self.predictor = new_predictor
                             logging.debug(f"Switching to new model: {new_predictor.model_id}")
+                        else:
+                            logging.debug(f"No suitable model found, sending new model request")
+                            latest_measurements = (
+                                self.predictor.get_measurements_in_current_prediction_horizon(timestamp))
+                            new_model_metadata = base_station.request_new_model(node_id, timestamp, latest_measurements)
+                            if new_model_metadata is not None:
+                                model = self.model_manager.add_model(new_model_metadata)
+                                logging.debug(f"Switching to new model: {new_model_metadata.model_id}")
+                                self.predictor = Predictor(model, self.predictor.data, self.predictor.prediction_period)
+
                     else:
                         logging.debug(
                             f"Threshold violation within the cooldown period, ignoring violations until "

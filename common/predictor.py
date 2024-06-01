@@ -48,7 +48,6 @@ class Predictor:
     """Uses a PredictionModel to provide predictions for arbitrary timestamps in the prediction range of the model."""
 
     def __init__(self, model: PredictionModel, data: DataStorage, prediction_period: timedelta) -> None:
-        assert model.metadata.output_length <= 24  # self.get_prediction_at(dt) expects a horizon of less than a day
         self._model = model
         self._data = data
         self._prediction_period_s = timedelta(seconds=prediction_period.seconds)
@@ -104,6 +103,14 @@ class Predictor:
         else:
             measurements = self._data.get_measurements_between(self.prediction_horizon_start, until)
             return measurements
+
+    def get_measurement(self, dt: datetime) -> Optional[pd.DataFrame]:
+        """
+        :param dt: The datetime of the measurement to retrieve.
+        :return: A pandas.DataFrame containing the measurements at the specified datetime, or None if no measurement is
+        available.
+        """
+        return self._data.get_measurements_between(dt, dt)
 
     def get_predictions_until(self, until: datetime) -> Optional[pd.DataFrame]:
         if self._prediction_horizon is None:

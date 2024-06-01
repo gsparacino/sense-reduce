@@ -59,7 +59,7 @@ def post_violation(node_id: str):
     if body.get('measurements') is not None:
         measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
         cluster_manager.add_measurements(node_id, measurements)
-        cluster_manager.handle_new_model_request(node_id)
+        # TODO: properly handle violation events, instead of just saving the measurements
     payload = dict()
     payload['portfolio'] = cluster_manager.get_models_in_portfolio()
     return payload

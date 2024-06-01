@@ -51,12 +51,13 @@ class BaseStationGateway:
         """
         body = {
             'threshold_metric': threshold_metric,
-            'prediction_period_s': frequency
+            'prediction_period_s': frequency,
+            'node_id': node_id
         }
         logging.debug(f'Registering node {node_id} with base station at {self.base_address}: {body}')
-        response = requests.post(f'{self.base_address}/register/{node_id}', json=body)
+        response = requests.post(f'{self.base_address}/nodes', json=body)
         if not response.ok:
-            raise RequestException(f'POST {self.base_address}/register/{node_id} returned {response.status_code}')
+            raise RequestException(f'POST {self.base_address}/nodes returned {response.status_code}')
 
         model_metadata = self._extract_model_metadata(response)
         initial_df = self._extract_initial_df(response, model_metadata)
@@ -127,9 +128,11 @@ class BaseStationGateway:
         :raises requests.RequestException: An error occurred while fetching the model.
         """
         logging.debug(f'Fetching model {model_id} from Base Station')
-        r = requests.get(f'{self.base_address}/models/{node_id}/{model_id}')
+        r = requests.get(f'{self.base_address}/nodes/{node_id}/models/{model_id}')
         if not r.ok:
-            raise RequestException(f'GET {self.base_address}/models/{node_id}/{model_id} returned {r.status_code}')
+            raise RequestException(
+                f'GET {self.base_address}/nodes/{node_id}/models/{model_id} returned {r.status_code}'
+            )
 
         return r.content
 
@@ -144,10 +147,10 @@ class BaseStationGateway:
         :raises requests.RequestException: An error occurred while fetching the model.
         """
         logging.debug(f'Fetching model {model_id} metadata from Base Station')
-        r = requests.get(f'{self.base_address}/models/{node_id}/{model_id}/metadata')
+        r = requests.get(f'{self.base_address}/nodes/{node_id}/models/{model_id}/metadata')
         if not r.ok:
             raise RequestException(
-                f'GET {self.base_address}/models/{node_id}/{model_id}/metadata returned {r.status_code}'
+                f'GET {self.base_address}/nodes/{node_id}/models/{model_id}/metadata returned {r.status_code}'
             )
 
         metadata = ModelMetadata.from_dict(r.json())
@@ -179,9 +182,9 @@ class BaseStationGateway:
         }
         logging.debug(f'Synchronization event: {body}')
 
-        response = requests.post(f'{self.base_address}/sync/{node_id}', json=body)
+        response = requests.post(f'{self.base_address}/nodes/{node_id}/sync', json=body)
         if not response.ok:
-            raise RequestException(f'POST {self.base_address}/sync/{node_id}  returned {response.status_code}')
+            raise RequestException(f'POST {self.base_address}/nodes/{node_id}/sync  returned {response.status_code}')
 
         return self._extract_models_portfolio(response)
 
@@ -191,9 +194,11 @@ class BaseStationGateway:
             'data': data.to_json(),
         }
         logging.debug(f'Requesting new model: {body}')
-        response = requests.post(f'{self.base_address}/models/{node_id}/new', json=body)
+        response = requests.post(f'{self.base_address}/nodes/{node_id}/models/new', json=body)
         if not response.ok:
-            raise RequestException(f'POST {self.base_address}/models/{node_id}/new returned {response.status_code}')
+            raise RequestException(
+                f'POST {self.base_address}/nodes/{node_id}/models/new returned {response.status_code}'
+            )
 
         return self._extract_model_metadata(response)
 
@@ -203,9 +208,11 @@ class BaseStationGateway:
             'measurements': data.to_json(),
         }
         logging.debug(f'Violation event: {body}')
-        response = requests.post(f'{self.base_address}/violation/{node_id}', json=body)
+        response = requests.post(f'{self.base_address}/nodes/{node_id}/violation', json=body)
         if not response.ok:
-            raise RequestException(f'POST {self.base_address}/violation/{node_id} returned {response.status_code}')
+            raise RequestException(
+                f'POST {self.base_address}/nodes/{node_id}/violation returned {response.status_code}'
+            )
 
         return self._extract_models_portfolio(response)
 

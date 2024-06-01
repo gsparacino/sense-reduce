@@ -14,10 +14,11 @@ event_logger = config.event_logger
 cluster_manager = ClusterManager(config)
 
 
-@app.post("/register/<string:node_id>")
-def register_node(node_id: str):
+@app.post("/nodes")
+def register_node():
     """Registers a new node and returns the model metadata and initial data for the node."""
     body: dict = request.get_json(force=True)
+    node_id = body["node_id"]
     threshold_metric = ThresholdMetric.from_dict(body['threshold_metric'])
 
     event_logger.log_event(LogEvent(node_id, LogEventType.REGISTRATION))
@@ -34,7 +35,7 @@ def register_node(node_id: str):
     return payload
 
 
-@app.post("/models/<string:node_id>/new")
+@app.post("/nodes/<string:node_id>/models/new")
 def post_new_model_request(node_id: str):
     logging.info(f'Node {node_id} requested a new model')
     body = request.get_json(force=True)
@@ -51,7 +52,7 @@ def post_new_model_request(node_id: str):
     return payload
 
 
-@app.post("/violation/<string:node_id>")
+@app.post("/nodes/<string:node_id>/violation")
 def post_violation(node_id: str):
     logging.info(f'Node {node_id} sent a violation notification')
     body = request.get_json(force=True)
@@ -64,7 +65,7 @@ def post_violation(node_id: str):
     return payload
 
 
-@app.get("/models/<string:node_id>/<string:model_id>")
+@app.get("/nodes/<string:node_id>/models/<string:model_id>")
 def get_model(node_id: str, model_id: str):
     logging.info(f'Node {node_id} requested model {model_id}')
     model_file_path = cluster_manager.get_model_upload_path(model_id)
@@ -72,14 +73,14 @@ def get_model(node_id: str, model_id: str):
     return send_file(model_file_path)
 
 
-@app.get("/models/<string:node_id>/<string:model_id>/metadata")
+@app.get("/nodes/<string:node_id>/models/<string:model_id>/metadata")
 def get_model_metadata(node_id: str, model_id: str):
     logging.info(f'Node {node_id} requested model {model_id}')
     metadata = cluster_manager.get_model_metadata(model_id)
     return metadata.to_dict()
 
 
-@app.post("/sync/<string:node_id>")
+@app.post("/nodes/<string:node_id>/sync")
 def sync(node_id: str):
     logging.info(f'Node {node_id} sent synchronization request')
     body = request.get_json(force=True)

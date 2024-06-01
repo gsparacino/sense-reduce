@@ -152,13 +152,17 @@ class ModelManager:
         best_score = threshold_metric.threshold_score(measurements, prediction)
         best_predictor = None
         for model in list(self._models.values()):
-            if model.metadata.model_id == current_predictor.model_id:
+            model_id = model.metadata.model_id
+            if model_id == current_predictor.model_id:
+                continue
+            if len(current_predictor.get_violations_of_model_in_prediction_horizon(model_id)) > 0:
+                logging.debug(f"Model {model_id} had violations in the current prediction horizon, skipping")
                 continue
             predictor = Predictor(model, current_predictor.data, current_predictor.prediction_period)
             predictor.update_prediction_horizon(timestamp)
             prediction = predictor.get_prediction_at(timestamp).to_numpy()
             score = threshold_metric.threshold_score(measurements, prediction)
-            logging.debug(f"{predictor.model_id} score: {best_score}")
+            logging.debug(f"{model_id} score: {best_score}")
             if score < best_score:
                 best_score = score
                 best_predictor = predictor

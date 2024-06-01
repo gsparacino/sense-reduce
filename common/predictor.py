@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 import pandas as pd
@@ -165,5 +165,18 @@ class Predictor:
     def get_prediction_timedelta(self):
         return self._prediction_period_s
 
-    def add_violation(self, dt: datetime):
+    def add_violation(self, dt: datetime) -> None:
         self._data.add_violation(dt, self.model_id)
+
+    def get_latest_violation_datetime(self) -> Optional[datetime]:
+        violations = self._data.get_violations()
+        if violations.size > 0:
+            latest_violation = violations.tail(1)
+            return latest_violation.index[0]
+        return None
+
+    def get_violations_of_model_in_prediction_horizon(self, model_id: str) -> List[datetime]:
+        violations = self._data.get_violations_of_model_id(model_id)
+        start = self.prediction_horizon_start
+        end = self.prediction_horizon_end
+        return list(violations[(violations.index >= start) & (violations.index <= end)].index)

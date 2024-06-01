@@ -15,7 +15,7 @@ class DataStorage:
     def __init__(self, input_features: List[str], output_features: List[str]) -> None:
         self._measurements = pd.DataFrame(columns=input_features, dtype=np.float64)
         self._predictions = pd.DataFrame(columns=output_features, dtype=np.float64)
-        self._violations = pd.DataFrame(columns=['model_id'], dtype=np.float64)
+        self._violations = pd.DataFrame(columns=['model_id'])
 
     @property
     def mae(self) -> pd.Series:

@@ -88,11 +88,9 @@ class SensorManager:
                 self.predictor.add_prediction(timestamp, prediction_array)
 
                 if threshold_metric.is_threshold_violation(measurements_array, prediction_array):
+                    latest_violation = self.predictor.get_latest_violation_datetime()
                     self.predictor.add_violation(timestamp)
-                    if (self._latest_violation_timestamp is None or
-                            timestamp - self._latest_violation_timestamp > cooldown):
-                        self._latest_violation_timestamp = timestamp
-
+                    if latest_violation is None or (timestamp - latest_violation) > cooldown:
                         logging.info(
                             f"Threshold violation: Measurement={measurement.values}, Prediction={prediction.values}"
                         )
@@ -118,7 +116,7 @@ class SensorManager:
                     else:
                         logging.debug(
                             f"Threshold violation within the cooldown period, ignoring violations until "
-                            f"{self._latest_violation_timestamp + cooldown}"
+                            f"{latest_violation + cooldown}"
                         )
 
             time.sleep(time_interval)

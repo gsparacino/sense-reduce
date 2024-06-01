@@ -11,9 +11,9 @@ from common import DataStorage, ModelMetadata
 
 
 class NodeInitialization:
-    def __init__(self, current_model: ModelMetadata, initial_data: DataStorage, portfolio: list[str]):
+    def __init__(self, current_model: ModelMetadata, data_storage: DataStorage, portfolio: list[str]):
         self.current_model: ModelMetadata = current_model
-        self.initial_data: DataStorage = initial_data
+        self.data_storage: DataStorage = data_storage
         self.portfolio: list[str] = portfolio
 
 

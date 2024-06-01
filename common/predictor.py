@@ -164,3 +164,6 @@ class Predictor:
 
     def get_prediction_timedelta(self):
         return self._prediction_period_s
+
+    def add_violation(self, dt: datetime):
+        self._data.add_violation(dt, self.model_id)

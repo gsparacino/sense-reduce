@@ -15,6 +15,7 @@ class DataStorage:
     def __init__(self, input_features: List[str], output_features: List[str]) -> None:
         self._measurements = pd.DataFrame(columns=input_features, dtype=np.float64)
         self._predictions = pd.DataFrame(columns=output_features, dtype=np.float64)
+        self._violations = pd.DataFrame(columns=['model_id'], dtype=np.float64)
 
     @property
     def mae(self) -> pd.Series:
@@ -100,6 +101,9 @@ class DataStorage:
     def add_prediction(self, dt: datetime.datetime, values: np.ndarray):
         self._predictions.loc[dt] = values
 
+    def add_violation(self, dt: datetime.datetime, model_id: str):
+        self._violations.loc[dt] = model_id
+
     def add_measurement_dict(self, d: dict):
         for date_string, values in d.items():
             self.add_measurement(datetime.datetime.fromisoformat(date_string), values)
@@ -126,6 +130,15 @@ class DataStorage:
 
     def get_predictions(self) -> pd.DataFrame:
         return self._predictions
+
+    def get_violations(self) -> pd.DataFrame:
+        return self._violations
+
+    def get_violations_of_model_id(self, model_id: str) -> pd.DataFrame:
+        return self._violations[self._violations.model_id == model_id]
+
+    def get_violations_between(self, start: datetime.datetime, end: datetime.datetime) -> pd.DataFrame:
+        return self._violations[self._violations.between(start, end)]
 
     def get_previous_measurements(self,
                                   until_dt: datetime.datetime,

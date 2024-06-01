@@ -66,7 +66,7 @@ def run(threshold_metric: ThresholdMetric,
 
         # TODO: move Predictor initialization into sensor_manager
         period = datetime.timedelta(seconds=prediction_interval)
-        predictor = Predictor(current_model, node_initialization.initial_data, period)
+        predictor = Predictor(current_model, node_initialization.data_storage, period)
         predictor.update_prediction_horizon(datetime.datetime.now())
 
         sensor_manager = SensorManager(NODE_ID, sensor, predictor, base_station, model_manager,

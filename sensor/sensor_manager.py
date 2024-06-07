@@ -1,7 +1,6 @@
 import datetime
 import logging
 import time
-from enum import Enum, auto
 
 import pandas as pd
 
@@ -14,29 +13,13 @@ NodeID = str
 
 
 class SensorManager:
-    class OperatingMode(Enum):
-        """
-        The sensor's operating mode is used to determine the amount of data that the sensor can send to the base station.
-        """
-
-        DATA_REDUCTION = auto(),
-        """
-        Aims to reduce the 'chattiness' of the Sensor: as long as the difference between a measurement and its 
-        corresponding prediction is below the configured threshold, the sensor will not send data to the Base Station.
-        """
-
-        MODEL_TRAINING = auto(),
-        """
-        The Sensor will send all measurements the Base Station, that will eventually provide a new model.
-        """
 
     def __init__(self,
                  node_id: NodeID,
                  sensor: AbstractSensor,
                  predictor: Predictor,
                  base_station_gateway: BaseStationGateway,
-                 model_manager: ModelManager,
-                 mode: OperatingMode = OperatingMode.DATA_REDUCTION
+                 model_manager: ModelManager
                  ) -> None:
         """
         Manages a sensor's measurements and prediction models, as well as handling coordination with the Base Station.
@@ -53,7 +36,6 @@ class SensorManager:
         self.predictor: Predictor = predictor
         self.model_manager: ModelManager = model_manager
         self.base_station_gateway: BaseStationGateway = base_station_gateway
-        self._operating_mode = mode
         self._latest_violation_timestamp = None
 
     def run(self, threshold_metric: ThresholdMetric, time_interval: float, cooldown: float) -> None:
@@ -77,47 +59,46 @@ class SensorManager:
             measurements_array = measurement.to_numpy()
             self.predictor.add_measurement(timestamp, measurements_array)
 
-            if self._operating_mode == SensorManager.OperatingMode.DATA_REDUCTION:
-                if not self.predictor.in_prediction_horizon(timestamp):
-                    self._synchronize_with_base_station(timestamp)
-                    self.predictor.update_prediction_horizon(timestamp)
-                prediction = self._get_prediction(timestamp)
-                logging.debug(f"Prediction by {self.predictor.model_id} @ {timestamp}: {prediction.values}")
+            if not self.predictor.in_prediction_horizon(timestamp):
+                self._synchronize_with_base_station(timestamp)
+                self.predictor.update_prediction_horizon(timestamp)
+            prediction = self._get_prediction(timestamp)
+            logging.debug(f"Prediction by {self.predictor.model_id} @ {timestamp}: {prediction.values}")
 
-                prediction_array = prediction.to_numpy()
-                self.predictor.add_prediction(timestamp, prediction_array)
+            prediction_array = prediction.to_numpy()
+            self.predictor.add_prediction(timestamp, prediction_array)
 
-                if threshold_metric.is_threshold_violation(measurements_array, prediction_array):
-                    latest_violation = self.predictor.get_latest_violation_datetime()
+            if threshold_metric.is_threshold_violation(measurements_array, prediction_array):
+                latest_violation_timestamp = self.predictor.get_latest_violation_datetime()
+                if latest_violation_timestamp is None or (timestamp - latest_violation_timestamp) > cooldown:
+                    logging.info(
+                        f"Threshold violation: Measurement={measurement.values}, Prediction={prediction.values}"
+                    )
                     self.predictor.add_violation(timestamp)
-                    if latest_violation is None or (timestamp - latest_violation) > cooldown:
-                        logging.info(
-                            f"Threshold violation: Measurement={measurement.values}, Prediction={prediction.values}"
-                        )
-                        violation_measurement = self.predictor.get_measurement(timestamp)
-                        models = base_station.send_violation(node_id, timestamp, violation_measurement)
-                        self.model_manager.synchronize_models(models)
-                        new_predictor = self.model_manager.get_better_predictor(
-                            threshold_metric, self.predictor, timestamp, measurements_array, prediction
-                        )
-                        if new_predictor is not None:
-                            self.predictor = new_predictor
-                            logging.debug(f"Switching to new model: {new_predictor.model_id}")
-                        else:
-                            logging.debug(f"No suitable model found, sending new model request")
-                            latest_measurements = (
-                                self.predictor.get_measurements_in_current_prediction_horizon(timestamp))
-                            new_model_metadata = base_station.request_new_model(node_id, timestamp, latest_measurements)
-                            if new_model_metadata is not None:
-                                model = self.model_manager.add_model(new_model_metadata)
-                                logging.debug(f"Switching to new model: {new_model_metadata.model_id}")
-                                self.predictor = Predictor(model, self.predictor.data, self.predictor.prediction_period)
-
+                    violation_measurement = self.predictor.get_measurement(timestamp)
+                    models = base_station.send_violation(node_id, timestamp, violation_measurement)
+                    self.model_manager.synchronize_models(models)
+                    new_predictor = self.model_manager.get_better_predictor(
+                        threshold_metric, self.predictor, timestamp, measurements_array, prediction
+                    )
+                    if new_predictor is not None:
+                        self.predictor = new_predictor
+                        logging.debug(f"Switching to new model: {new_predictor.model_id}")
                     else:
-                        logging.debug(
-                            f"Threshold violation within the cooldown period, ignoring violations until "
-                            f"{latest_violation + cooldown}"
-                        )
+                        logging.debug(f"No suitable model found, sending new model request")
+                        latest_measurements = (
+                            self.predictor.get_measurements_in_current_prediction_horizon(timestamp))
+                        new_model_metadata = base_station.request_new_model(node_id, timestamp, latest_measurements)
+                        if new_model_metadata is not None:
+                            model = self.model_manager.add_model(new_model_metadata)
+                            logging.debug(f"Switching to new model: {new_model_metadata.model_id}")
+                            self.predictor = Predictor(model, self.predictor.data, self.predictor.prediction_period)
+
+                else:
+                    logging.debug(
+                        f"Threshold violation within the cooldown period, ignoring violations until "
+                        f"{latest_violation_timestamp + cooldown}"
+                    )
 
             time.sleep(time_interval)
 

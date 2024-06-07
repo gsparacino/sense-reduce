@@ -139,7 +139,6 @@ class ModelManager:
         Iterates over the provided PredictionModels, comparing their performance on the latest measurements and returning
         a Predictor with the best model.
 
-        :param models: the list of models to evaluate against the threshold metric
         :param threshold_metric: the threshold metric used to rank the models
         :param current_predictor: the Predictor currently used by the Sensor
         :param timestamp: the timestamp when the latest measurements were taken
@@ -155,12 +154,11 @@ class ModelManager:
             model_id = model.metadata.model_id
             if model_id == current_predictor.model_id:
                 continue
-            if len(current_predictor.get_violations_of_model_in_prediction_horizon(model_id)) > 0:
-                logging.debug(f"Model {model_id} had violations in the current prediction horizon, skipping")
-                continue
             predictor = Predictor(model, current_predictor.data, current_predictor.prediction_period)
             predictor.update_prediction_horizon(timestamp)
             prediction = predictor.get_prediction_at(timestamp).to_numpy()
+            if threshold_metric.is_threshold_violation(measurements, prediction):
+                continue
             score = threshold_metric.threshold_score(measurements, prediction)
             logging.debug(f"{model_id} score: {best_score}")
             if score < best_score:

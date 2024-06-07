@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -174,9 +174,3 @@ class Predictor:
             latest_violation = violations.tail(1)
             return latest_violation.index[0]
         return None
-
-    def get_violations_of_model_in_prediction_horizon(self, model_id: str) -> List[datetime]:
-        violations = self._data.get_violations_of_model_id(model_id)
-        start = self.prediction_horizon_start
-        end = self.prediction_horizon_end
-        return list(violations[(violations.index >= start) & (violations.index <= end)].index)

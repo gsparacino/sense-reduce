@@ -35,23 +35,6 @@ def register_node():
     return payload
 
 
-@app.post("/nodes/<string:node_id>/models/new")
-def post_new_model_request(node_id: str):
-    logging.info(f'Node {node_id} requested a new model')
-    body = request.get_json(force=True)
-
-    if body.get('measurements') is not None:
-        measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
-        cluster_manager.add_measurements(node_id, measurements)
-
-    new_model = cluster_manager.handle_new_model_request(node_id)
-    payload = dict()
-    if new_model is not None:
-        payload['model_metadata'] = new_model.metadata.to_dict()
-    logging.debug(f'Responding to node {node_id} with payload: {payload}')
-    return payload
-
-
 @app.post("/nodes/<string:node_id>/violation")
 def post_violation(node_id: str):
     logging.info(f'Node {node_id} sent a violation notification')
@@ -60,6 +43,11 @@ def post_violation(node_id: str):
         measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
         cluster_manager.add_measurements(node_id, measurements)
         # TODO: properly handle violation events, instead of just saving the measurements
+    new_model_flag: bool = body['needs_new_model']
+    if new_model_flag:
+        logging.info(f'Node {node_id} requested a new model')
+        cluster_manager.handle_new_model_request(node_id)
+
     payload = dict()
     payload['portfolio'] = cluster_manager.get_models_in_portfolio()
     return payload

@@ -188,24 +188,14 @@ class BaseStationGateway:
 
         return self._extract_models_portfolio(response)
 
-    def request_new_model(self, node_id: str, dt: datetime.datetime, data: pd.DataFrame) -> Optional[ModelMetadata]:
-        body = {
-            'timestamp': dt.isoformat(),
-            'data': data.to_json(),
-        }
-        logging.debug(f'Requesting new model: {body}')
-        response = requests.post(f'{self.base_address}/nodes/{node_id}/models/new', json=body)
-        if not response.ok:
-            raise RequestException(
-                f'POST {self.base_address}/nodes/{node_id}/models/new returned {response.status_code}'
-            )
-
-        return self._extract_model_metadata(response)
-
-    def send_violation(self, node_id: str, dt: datetime.datetime, data: pd.DataFrame) -> list[str]:
+    def send_violation(self, node_id: str,
+                       dt: datetime.datetime,
+                       data: pd.DataFrame,
+                       request_new_model: bool = False) -> list[str]:
         body = {
             'timestamp': dt.isoformat(),
             'measurements': data.to_json(),
+            'needs_new_model': request_new_model
         }
         logging.debug(f'Violation event: {body}')
         response = requests.post(f'{self.base_address}/nodes/{node_id}/violation', json=body)

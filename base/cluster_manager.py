@@ -1,4 +1,5 @@
 import os
+import threading
 from datetime import datetime
 from typing import Optional
 
@@ -21,6 +22,7 @@ class ClusterManager:
         self._model_portfolio = ModelPortfolio(config)
         self._model_trainer = DefaultModelTrainer(epochs=2)
         self._training_df: pd.DataFrame = pd.read_pickle(config.training_data_pickle_path)
+        self._training_threads: dict[NodeID, threading.Thread] = {}
 
     def add_node(self, node_id: NodeID, threshold_metric: ThresholdMetric, data: pd.DataFrame = None) -> None:
         model = self._model_portfolio.base_model
@@ -63,8 +65,10 @@ class ClusterManager:
         node_manager = self._get_node(node_id)
         measurements = node_manager.get_measurements()
         metadata = node_manager.model.metadata
-        # TODO: train new model in a dedicated thread
-        self._train_new_model(metadata, measurements)
+        if self._training_threads.get(node_id) is None or not self._training_threads[node_id].is_alive():
+            training_thread = threading.Thread(target=self._train_new_model, args=(metadata, measurements))
+            self._training_threads[node_id] = training_thread
+            training_thread.start()
         return None
 
     def _train_new_model(self, model_metadata: ModelMetadata, data: pd.DataFrame = None) -> Model:

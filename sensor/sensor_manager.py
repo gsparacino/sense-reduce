@@ -60,7 +60,6 @@ class SensorManager:
             self.predictor.add_measurement(timestamp, measurements_array)
 
             if not self.predictor.in_prediction_horizon(timestamp):
-                self._synchronize_with_base_station(timestamp)
                 self.predictor.update_prediction_horizon(timestamp)
             prediction = self._get_prediction(timestamp)
             logging.debug(f"Prediction by {self.predictor.model_id} @ {timestamp}: {prediction.values}")
@@ -81,6 +80,7 @@ class SensorManager:
                     if new_predictor is not None:
                         self.predictor = new_predictor
                         logging.debug(f"Switching to new model: {new_predictor.model_id}")
+                        self._synchronize_with_base_station(timestamp)
                     else:
                         logging.debug(f"No suitable model found, requesting new model")
                         request_new_model = True
@@ -106,7 +106,7 @@ class SensorManager:
         predictor.add_prediction(timestamp, prediction.to_numpy())
         return prediction
 
-    def _synchronize_with_base_station(self, timestamp: datetime.datetime):
+    def _synchronize_with_base_station(self, timestamp: datetime.datetime) -> None:
         """
         Synchronizes with the base station state by sending the latest measurements, and fetching or deleting local
         models to reflect the current state of the models' portfolio on the Base Station.
@@ -115,7 +115,7 @@ class SensorManager:
         """
         predictor = self.predictor
         latest_measurements = predictor.get_measurements_in_current_prediction_horizon(timestamp)
-        models = self.base_station_gateway.synchronize(self.node_id, timestamp, latest_measurements)
+        models = self.base_station_gateway.synchronize(self.node_id, timestamp, predictor.model_id, latest_measurements)
         self.model_manager.synchronize_models(models)
 
     def _get_measurement(self) -> (pd.Series, datetime):

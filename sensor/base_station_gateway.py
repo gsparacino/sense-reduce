@@ -127,6 +127,7 @@ class BaseStationGateway:
     def synchronize(self,
                     node_id: str,
                     dt: datetime.datetime,
+                    model_id: str,
                     measurements: pd.DataFrame
                     ) -> Optional[list[str]]:
         """
@@ -136,6 +137,7 @@ class BaseStationGateway:
         :param node_id: The node's unique ID.
         :param dt: The timestamp of the synchronization, i.e. the timestamp at which the latest measurement was read,
         as a datetime object.
+        :param model_id: the ID of the model currently active on the node, as a string.
         :param measurements: The (reduced) measurements that occurred in the current prediction horizon, as a NumPy array.
 
         :return: A list of common.ModelMetadata, containing the metadata of the models that the sensor could fetch from
@@ -146,6 +148,7 @@ class BaseStationGateway:
         body = {
             'timestamp': dt.isoformat(),
             'measurements': measurements.to_json(),
+            'model': model_id
         }
         logging.debug(f'Synchronization event: {body}')
 

@@ -76,6 +76,7 @@ def sync(node_id: str):
     if body.get('measurements') is not None:
         measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
         cluster_manager.add_measurements(node_id, measurements)
+    cluster_manager.set_current_model(node_id, body['model'])
     payload = dict()
     payload['portfolio'] = cluster_manager.get_recommended_models(node_id)
     return payload

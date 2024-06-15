@@ -71,6 +71,14 @@ class ClusterManager:
         """
         return self._get_node(node_id).model
 
+    def set_current_model(self, node_id: NodeID, model_id: ModelID) -> None:
+        """
+        :param node_id: the id of a node
+        :param model_id: the model that is currently active on the given node
+        """
+        model = self._model_manager.get_model(model_id)
+        self._get_node(node_id).model = model
+
     def get_recommended_models(self, node_id: NodeID) -> list[ModelID]:
         """
         :param node_id: the id of a node

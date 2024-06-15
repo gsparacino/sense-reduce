@@ -26,6 +26,7 @@ class ModelManager:
         self._base_station = base_station_gateway
         self._model_dir = os.path.join(ModelManager.base_dir, model_dir)
         self._models: dict[str, PredictionModel] = {}
+        self._model_rankings: dict[str, int] = {}
         self._load_local_models()
 
     def _save_model(self, model_bytes: bytes, metadata: ModelMetadata) -> PredictionModel:
@@ -161,9 +162,9 @@ class ModelManager:
                 logging.debug(f"Model candidate {model_id} would have violated the threshold, skipping")
                 continue
             score = threshold_metric.threshold_score(measurements, prediction)
-            logging.debug(f"Model candidate {model_id} score: {best_score}")
+            logging.debug(f"Model candidate {model_id} score: {score} | score to beat: {best_score}")
             if score < best_score:
+                logging.debug(f"New best model: {predictor.model_id}")
                 best_score = score
                 best_predictor = predictor
-                logging.debug(f"New best model: {predictor.model_id}")
         return best_predictor

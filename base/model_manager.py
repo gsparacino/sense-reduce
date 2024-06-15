@@ -3,17 +3,21 @@ from typing import Dict, List
 
 from base import Config
 from base.model import Model, ModelID
-from common import ModelMetadata
 from common.model_utils import load_model_from_savemodel, save_model, get_model_tflite_path, \
     get_model_dir_path
 
 
-class ModelPortfolio:
+class ModelManager:
 
     def __init__(
             self,
             config: Config
     ):
+        """
+        Handles I/O operations for Models.
+
+        :param config: a Configuration object, containing the app's configuration parameters.
+        """
         self._model_dir = config.model_dir
         self._models: Dict[ModelID, Model] = {}
         self._load_local_models()
@@ -29,8 +33,11 @@ class ModelPortfolio:
     #     model = clone_model(model)
     #     self.save_model(model)
     #     return model
-    def get_available_models(self) -> List[ModelID]:
-        models: List[ModelMetadata] = list(model.model_id for _, model in self._models.items())
+    def get_all_models(self) -> List[ModelID]:
+        """
+        :return: the list of IDs of all available models.
+        """
+        models: List[ModelID] = list(model_id for model_id in self._models.keys())
         return models
 
     def get_model(self, model_id: ModelID) -> Model:

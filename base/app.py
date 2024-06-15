@@ -30,7 +30,7 @@ def register_node():
     payload = dict()
     payload['model_metadata'] = model.metadata.to_dict()
     payload['initial_df'] = initial_df.to_json()
-    payload['portfolio'] = cluster_manager.get_models_in_portfolio()
+    payload['portfolio'] = cluster_manager.get_recommended_models(node_id)
     logging.debug(f'Responding to new node with payload: {payload}')
     return payload
 
@@ -49,7 +49,7 @@ def post_violation(node_id: str):
         cluster_manager.handle_new_model_request(node_id)
 
     payload = dict()
-    payload['portfolio'] = cluster_manager.get_models_in_portfolio()
+    payload['portfolio'] = cluster_manager.get_recommended_models(node_id)
     return payload
 
 
@@ -76,7 +76,7 @@ def sync(node_id: str):
         measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
         cluster_manager.add_measurements(node_id, measurements)
     payload = dict()
-    payload['portfolio'] = cluster_manager.get_models_in_portfolio()
+    payload['portfolio'] = cluster_manager.get_recommended_models(node_id)
     return payload
 
 

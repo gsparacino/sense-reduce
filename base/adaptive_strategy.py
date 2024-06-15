@@ -12,7 +12,7 @@ from base.node_manager import NodeManager, NodeID
 from common import ModelMetadata
 
 
-class DeploymentStrategy:
+class AdaptiveStrategy:
 
     def __init__(self, config: Config, model_manager: ModelManager, model_trainer: ModelTrainer):
         self._config = config

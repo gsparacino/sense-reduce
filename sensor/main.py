@@ -69,8 +69,10 @@ def run(threshold_metric: ThresholdMetric,
         predictor = Predictor(current_model, node_initialization.data_storage, period)
         predictor.update_prediction_horizon(datetime.datetime.now())
 
-        sensor_manager = SensorManager(NODE_ID, sensor, predictor, base_station, model_manager)
-        sensor_manager.run(threshold_metric, time_interval, cooldown)
+        sensor_manager = (
+            SensorManager(NODE_ID, sensor, predictor, base_station, model_manager, threshold_metric, cooldown)
+        )
+        sensor_manager.run(time_interval)
     else:
         raise ValueError(f'Unsupported data reduction mode: {data_reduction_mode}')
 

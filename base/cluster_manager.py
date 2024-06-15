@@ -5,7 +5,7 @@ from typing import List
 import pandas as pd
 
 from base import Config
-from base.deployment_strategy import DeploymentStrategy
+from base.adaptive_strategy import AdaptiveStrategy
 from base.model import Model, ModelID
 from base.model_manager import ModelManager
 from base.model_trainer import DefaultModelTrainer
@@ -21,9 +21,9 @@ class ClusterManager:
         # TODO: make ModelTrainer configurable
         self._model_trainer = DefaultModelTrainer(epochs=2)
         self._training_df: pd.DataFrame = pd.read_pickle(config.training_data_pickle_path)
-        # TODO: make deployment strategy configurable.
+        # TODO: make strategy configurable.
         #  extension idea: ClusterManager can change strategy at runtime, depending on the context
-        self._deployment_strategy = DeploymentStrategy(config, self._model_manager, self._model_trainer)
+        self._adaptive_strategy = AdaptiveStrategy(config, self._model_manager, self._model_trainer)
 
     def add_node(self, node_id: NodeID, threshold_metric: ThresholdMetric, data: pd.DataFrame = None) -> None:
         """
@@ -84,7 +84,7 @@ class ClusterManager:
         :param node_id: the id of a node
         :return: the list of recommended models for the given node
         """
-        return self._deployment_strategy.get_recommended_models(self._get_node(node_id), self._get_cluster_nodes())
+        return self._adaptive_strategy.get_recommended_models(self._get_node(node_id), self._get_cluster_nodes())
 
     def get_model_upload_path(self, model_id: ModelID) -> os.path:
         """
@@ -107,7 +107,7 @@ class ClusterManager:
         :param node_portfolio: the node's current portfolio of models.
         :param node_id: The ID of the node that requested a new model.
         """
-        self._deployment_strategy.handle_new_model_request(
+        self._adaptive_strategy.handle_new_model_request(
             self._get_node(node_id), node_portfolio, self._get_cluster_nodes()
         )
 

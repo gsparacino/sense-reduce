@@ -39,10 +39,10 @@ def register_node():
 def post_violation(node_id: str):
     logging.info(f'Node {node_id} sent a violation notification')
     body = request.get_json(force=True)
+    cluster_manager.add_violation(node_id, body['timestamp'], body['model'])
     if body.get('measurements') is not None:
         measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
         cluster_manager.add_measurements(node_id, measurements)
-        # TODO: properly handle violation events, instead of just saving the measurements
     new_model_flag: bool = body['needs_new_model']
     if new_model_flag:
         logging.info(f'Node {node_id} requested a new model')

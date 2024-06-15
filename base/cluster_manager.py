@@ -56,6 +56,14 @@ class ClusterManager:
         """
         return self._get_node(node_id).get_measurements()
 
+    def add_violation(self, node_id: NodeID, timestamp: datetime, model_id: ModelID) -> None:
+        """
+        :param node_id: the id of the node that reported a violation
+        :param timestamp: the datetime of the violation
+        :param model_id: the model that caused the violation
+        """
+        self._get_node(node_id).add_violation(timestamp, model_id)
+
     def get_current_model(self, node_id: NodeID) -> Model:
         """
         :param node_id: the id of a node

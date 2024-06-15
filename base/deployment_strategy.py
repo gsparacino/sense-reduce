@@ -26,18 +26,7 @@ class DeploymentStrategy:
         :param cluster_nodes: the nodes in the cluster of the given node
         :return: the list of recommended model IDs for the given node
         """
-        num_nodes = len(cluster_nodes)
-        if num_nodes < 2:
-            return self._model_manager.get_all_models()
-
-        models_score: dict[ModelID, float] = {}
-
-        for node in cluster_nodes:
-            model_id = node.model.model_id
-            if model_id not in models_score:
-                models_score[model_id] = 0.0
-            models_score[model_id] += 1 / num_nodes
-        return list([model_id for model_id in models_score.keys() if models_score[model_id] > 0.1])
+        return self._model_manager.get_all_models()
 
     def handle_new_model_request(self,
                                  node: NodeManager, node_portfolio: List[ModelID], cluster_nodes: List[NodeManager]

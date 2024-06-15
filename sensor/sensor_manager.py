@@ -88,7 +88,7 @@ class SensorManager:
                     violation_measurement = self.predictor.get_measurement(timestamp)
                     portfolio = self.model_manager.get_models_in_portfolio()
                     models = base_station.send_violation(
-                        node_id, timestamp, violation_measurement, portfolio, request_new_model
+                        node_id, timestamp, violation_measurement, self.predictor.model_id, portfolio, request_new_model
                     )
                     self.model_manager.synchronize_models(models)
 

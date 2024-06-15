@@ -4,7 +4,7 @@ from typing import Optional
 import pandas as pd
 from pandas import Series, DataFrame
 
-from base.model import Model
+from base.model import Model, ModelID
 from common import ThresholdMetric, PredictionHorizon, DataStorage
 
 NodeID = str
@@ -39,8 +39,15 @@ class NodeManager:
     def get_measurements_between(self, start: datetime, end: datetime) -> DataFrame:
         return self._data_storage.get_measurements_between(start, end)
 
-    def get_measurements(self):
+    def get_measurements(self) -> DataFrame:
         return self._data_storage.get_measurements()
+
+    def add_violation(self, dt: datetime, model_id: ModelID):
+        self._data_storage.add_violation(dt, model_id)
+
+    def get_violations_of_model(self, model_id: ModelID) -> DataFrame:
+        violations = self._data_storage.get_violations()
+        return violations.loc[violations['model'] == model_id]
 
     def _update_prediction_horizon(self, dt: datetime) -> None:
         dt_start = dt - timedelta(minutes=1)

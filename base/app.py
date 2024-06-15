@@ -46,7 +46,8 @@ def post_violation(node_id: str):
     new_model_flag: bool = body['needs_new_model']
     if new_model_flag:
         logging.info(f'Node {node_id} requested a new model')
-        cluster_manager.handle_new_model_request(node_id)
+        node_portfolio = body['portfolio']
+        cluster_manager.handle_new_model_request(node_id, node_portfolio)
 
     payload = dict()
     payload['portfolio'] = cluster_manager.get_recommended_models(node_id)

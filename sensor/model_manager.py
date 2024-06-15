@@ -54,6 +54,12 @@ class ModelManager:
         model = self._models.get(model_name)
         return model
 
+    def get_models_in_portfolio(self) -> list[str]:
+        """
+        :return: the list of IDs of all models in the portfolio.
+        """
+        return list(model.metadata.model_id for model in self._models.values())
+
     def add_model(self, metadata: ModelMetadata) -> PredictionModel:
         """
         Adds a new model to the Sensor's portfolio, fetching it from the Base Station.

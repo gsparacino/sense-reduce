@@ -191,10 +191,12 @@ class BaseStationGateway:
     def send_violation(self, node_id: str,
                        dt: datetime.datetime,
                        data: pd.DataFrame,
+                       portfolio: list[str],
                        request_new_model: bool = False) -> list[str]:
         body = {
             'timestamp': dt.isoformat(),
             'measurements': data.to_json(),
+            'portfolio': portfolio,
             'needs_new_model': request_new_model
         }
         logging.debug(f'Violation event: {body}')

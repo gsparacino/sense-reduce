@@ -1,7 +1,8 @@
+import logging
 import os
 import threading
 from datetime import datetime
-from typing import Optional
+from typing import List
 
 import pandas as pd
 
@@ -68,13 +69,23 @@ class ClusterManager:
     def get_model_metadata(self, model_id: ModelID) -> ModelMetadata:
         return self._model_manager.get_model(model_id).metadata
 
-    def handle_new_model_request(self, node_id: NodeID) -> Optional[Model]:
+    def handle_new_model_request(self, node_id: NodeID, node_portfolio: List[ModelID]) -> None:
         """
         Handles a new model request sent by a Node.
 
+        :param node_portfolio: the node's current portfolio of models.
         :param node_id: The ID of the node that requested a new model.
         """
-        # TODO: implement adaptation logic to determine the right moment to train a new model
+        for recommended_model in self.get_recommended_models(node_id):
+            if recommended_model not in node_portfolio:
+                # Node's Portfolio is not up-to-date with all the BS recommendations, do not train a new model
+                # (let the node try the new recommended models first)
+                logging.debug(
+                    "Node's Portfolio is not up-to-date with all the BS recommendations, do not train a new model"
+                )
+                return
+
+        # TODO: improve adaptation logic to determine the right moment to train a new model
         node_manager = self._get_node(node_id)
         measurements = node_manager.get_measurements()
         metadata = node_manager.model.metadata
@@ -82,7 +93,6 @@ class ClusterManager:
             training_thread = threading.Thread(target=self._train_new_model, args=(metadata, measurements))
             self._training_threads[node_id] = training_thread
             training_thread.start()
-        return None
 
     def _train_new_model(self, model_metadata: ModelMetadata, data: pd.DataFrame = None) -> Model:
         """

@@ -1,12 +1,11 @@
-import logging
 import os
-import threading
 from datetime import datetime
 from typing import List
 
 import pandas as pd
 
 from base import Config
+from base.deployment_strategy import DeploymentStrategy
 from base.model import Model, ModelID
 from base.model_manager import ModelManager
 from base.model_trainer import DefaultModelTrainer
@@ -22,9 +21,18 @@ class ClusterManager:
         # TODO: make ModelTrainer configurable
         self._model_trainer = DefaultModelTrainer(epochs=2)
         self._training_df: pd.DataFrame = pd.read_pickle(config.training_data_pickle_path)
-        self._training_threads: dict[NodeID, threading.Thread] = {}
+        # TODO: make deployment strategy configurable.
+        #  extension idea: ClusterManager can change strategy at runtime, depending on the context
+        self._deployment_strategy = DeploymentStrategy(config, self._model_manager, self._model_trainer)
 
     def add_node(self, node_id: NodeID, threshold_metric: ThresholdMetric, data: pd.DataFrame = None) -> None:
+        """
+        Adds a new node to the cluster handled by this ClusterManager.
+
+        :param node_id: the id of the node to add
+        :param threshold_metric: the threshold metric to use for the new node
+        :param data: the measurements to preload on the new node
+        """
         model = self._model_manager.base_model
         node_manager = NodeManager(node_id, threshold_metric, model)
         if data is None:
@@ -34,39 +42,46 @@ class ClusterManager:
         self._nodes[node_id] = node_manager
 
     def add_measurements(self, node_id: NodeID, measurements: pd.DataFrame) -> None:
+        """
+        :param node_id: the id of a node
+        :param measurements: the dataframe of measurements that will be added to the node's measurements
+        """
         node = self._get_node(node_id)
         node.add_measurements(measurements)
 
     def get_measurements(self, node_id: NodeID) -> pd.DataFrame:
+        """
+        :param node_id: the id of a node
+        :return: all the measurements persisted for the given node
+        """
         return self._get_node(node_id).get_measurements()
 
     def get_current_model(self, node_id: NodeID) -> Model:
+        """
+        :param node_id: the id of a node
+        :return: the Model that is currently active on the given node
+        """
         return self._get_node(node_id).model
 
-    def _get_all_models(self) -> list[ModelID]:
-        """
-        :return: The list of ModelIDs of the models in the portfolio.
-        """
-        return self._model_manager.get_all_models()
-
     def get_recommended_models(self, node_id: NodeID) -> list[ModelID]:
-        num_nodes = len(self._nodes)
-        if num_nodes < 2:
-            return self._get_all_models()
-
-        models_score: dict[ModelID, float] = {}
-
-        for node in self._nodes.values():
-            model_id = node.model.model_id
-            if model_id not in models_score:
-                models_score[model_id] = 0.0
-            models_score[model_id] += 1 / num_nodes
-        return list([model_id for model_id in models_score.keys() if models_score[model_id] > 0.1])
+        """
+        :param node_id: the id of a node
+        :return: the list of recommended models for the given node
+        """
+        return self._deployment_strategy.get_recommended_models(self._get_node(node_id), self._get_cluster_nodes())
 
     def get_model_upload_path(self, model_id: ModelID) -> os.path:
+        """
+        :param model_id: the id of a model
+        :return: the os.path of the requested model, i.e. the file system path of the model's files
+        """
         return self._model_manager.get_model_tflite_file_path(model_id)
 
     def get_model_metadata(self, model_id: ModelID) -> ModelMetadata:
+        """
+        :param model_id: the id of a model
+        :return: the ModelMetadata of the requested model
+        """
         return self._model_manager.get_model(model_id).metadata
 
     def handle_new_model_request(self, node_id: NodeID, node_portfolio: List[ModelID]) -> None:
@@ -76,37 +91,9 @@ class ClusterManager:
         :param node_portfolio: the node's current portfolio of models.
         :param node_id: The ID of the node that requested a new model.
         """
-        for recommended_model in self.get_recommended_models(node_id):
-            if recommended_model not in node_portfolio:
-                # Node's Portfolio is not up-to-date with all the BS recommendations, do not train a new model
-                # (let the node try the new recommended models first)
-                logging.debug(
-                    "Node's Portfolio is not up-to-date with all the BS recommendations, do not train a new model"
-                )
-                return
-
-        # TODO: improve adaptation logic to determine the right moment to train a new model
-        node_manager = self._get_node(node_id)
-        measurements = node_manager.get_measurements()
-        metadata = node_manager.model.metadata
-        if self._training_threads.get(node_id) is None or not self._training_threads[node_id].is_alive():
-            training_thread = threading.Thread(target=self._train_new_model, args=(metadata, measurements))
-            self._training_threads[node_id] = training_thread
-            training_thread.start()
-
-    def _train_new_model(self, model_metadata: ModelMetadata, data: pd.DataFrame = None) -> Model:
-        """
-        Trains a new model for the provided Node with the provided metadata, using the provided data as training set.
-        The new model is then saved into the Cluster's portfolio.
-
-        :param model_metadata: the metadata of the new model
-        :param data: the training data
-        :return: the new Model
-        """
-        base_model: Model = self._model_manager.base_model
-        new_model = self._model_trainer.train_new_model(base_model.model, model_metadata, data)
-        self._model_manager.save_model(new_model)
-        return new_model
+        self._deployment_strategy.handle_new_model_request(
+            self._get_node(node_id), node_portfolio, self._get_cluster_nodes()
+        )
 
     def _get_data(self, node_id: NodeID, start: datetime, end: datetime) -> pd.DataFrame:
         node_manager = self._get_node(node_id)
@@ -117,3 +104,6 @@ class ClusterManager:
         if node is None:
             raise ValueError(f'Node id {node_id} is not valid.')
         return node
+
+    def _get_cluster_nodes(self) -> List[NodeManager]:
+        return list(self._nodes.values())

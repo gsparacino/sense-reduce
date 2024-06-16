@@ -44,10 +44,11 @@ class SensorManager:
         self.predictor: Predictor = predictor
         self.model_manager: ModelManager = model_manager
         self.base_station_gateway: BaseStationGateway = base_station_gateway
-        self._latest_violation_timestamp = None
-        self._cooldown = datetime.timedelta(seconds=cooldown)
         self._adaptive_strategy = (
-            AdaptiveStrategy(threshold_metric, model_manager, base_station_gateway)
+            AdaptiveStrategy(
+                threshold_metric, model_manager, base_station_gateway,
+                datetime.timedelta(seconds=cooldown)
+            )
         )
         self._threshold_metric = threshold_metric
 
@@ -74,21 +75,10 @@ class SensorManager:
             self.predictor.add_prediction(timestamp, prediction_array)
 
             if self._adaptive_strategy.is_violation(measurements_array, prediction_array):
-                if self._not_in_cooldown(timestamp):
-                    self._latest_violation_timestamp = timestamp
-                    violation = Violation(node_id, timestamp, self.predictor, measurements_array, prediction_array)
-                    self.predictor = self._adaptive_strategy.handle_violation(violation)
-                else:
-                    logging.debug(
-                        f"Threshold violation happened within the cooldown period. Ignoring violations until "
-                        f"{self._latest_violation_timestamp + self._cooldown}"
-                    )
+                violation = Violation(node_id, timestamp, self.predictor, measurements_array, prediction_array)
+                self.predictor = self._adaptive_strategy.handle_violation(violation)
 
             time.sleep(time_interval)
-
-    def _not_in_cooldown(self, timestamp):
-        latest_violation = self._latest_violation_timestamp
-        return latest_violation is None or (timestamp - latest_violation) > self._cooldown
 
     def _get_prediction(self, timestamp: datetime.datetime):
         predictor = self.predictor

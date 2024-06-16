@@ -1,5 +1,6 @@
 import datetime
 import logging
+from abc import ABC, abstractmethod
 
 import numpy as np
 
@@ -9,8 +10,31 @@ from sensor.base_station_gateway import BaseStationGateway
 from sensor.model_manager import ModelManager
 
 
-class AdaptiveStrategy:
+class AdaptiveStrategy(ABC):
 
+    @abstractmethod
+    def is_violation(self, measurement: np.array, prediction: np.array) -> bool:
+        """
+        Tests whether a measurement is incompatible with the corresponding prediction, signaling that the current
+        Predictor may be inadequate.
+
+        :param measurement: the measurement to be tested
+        :param prediction: the prediction to compare the measurement against
+        """
+        pass
+
+    @abstractmethod
+    def handle_violation(self, violation: Violation) -> Predictor:
+        """
+        Handles a violation, providing an updated Predictor.
+
+        :param violation: the violation data
+        :return: an updated Predictor
+        """
+        pass
+
+
+class DefaultAdaptiveStrategy(AdaptiveStrategy):
     def __init__(self,
                  threshold_metric: ThresholdMetric,
                  model_manager: ModelManager,

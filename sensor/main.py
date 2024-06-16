@@ -9,7 +9,7 @@ import requests
 
 from common import ThresholdMetric, L2Threshold
 from sensor.abstract_sensor import AbstractSensor
-from sensor.adaptive_strategy import AdaptiveStrategy
+from sensor.adaptive_strategy import DefaultAdaptiveStrategy
 from sensor.base_station_gateway import BaseStationGateway
 from sensor.model_manager import ModelManager
 from sensor.sensor_manager import SensorManager
@@ -65,7 +65,7 @@ def run(threshold_metric: ThresholdMetric,
 
         # TODO: make strategy configurable
         adaptive_strategy = (
-            AdaptiveStrategy(threshold_metric, model_manager, base_station, datetime.timedelta(seconds=cooldown))
+            DefaultAdaptiveStrategy(threshold_metric, model_manager, base_station, datetime.timedelta(seconds=cooldown))
         )
 
         sensor_manager = (

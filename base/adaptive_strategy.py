@@ -1,5 +1,6 @@
 import logging
 import threading
+from abc import ABC, abstractmethod
 from typing import List
 
 import pandas as pd
@@ -12,7 +13,32 @@ from base.node_manager import NodeManager, NodeID
 from common import ModelMetadata
 
 
-class AdaptiveStrategy:
+class AdaptiveStrategy(ABC):
+
+    @abstractmethod
+    def get_recommended_models(self, node: NodeManager, cluster_nodes: List[NodeManager]) -> List[ModelID]:
+        """
+        :param node: the node to get recommended models for
+        :param cluster_nodes: the nodes in the cluster of the given node
+        :return: the list of recommended model IDs for the given node
+        """
+        pass
+
+    @abstractmethod
+    def handle_new_model_request(self,
+                                 node: NodeManager, node_portfolio: List[ModelID], cluster_nodes: List[NodeManager]
+                                 ) -> None:
+        """
+        Handles a new model request sent by a Node.
+
+        :param node: the node that requested a new model
+        :param node_portfolio: the node's current portfolio of models.
+        :param cluster_nodes: the nodes currently in the cluster
+        """
+        pass
+
+
+class DefaultAdaptiveStrategy(AdaptiveStrategy):
 
     def __init__(self, config: Config, model_manager: ModelManager, model_trainer: ModelTrainer):
         self._config = config

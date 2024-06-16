@@ -5,7 +5,7 @@ from typing import List
 import pandas as pd
 
 from base import Config
-from base.adaptive_strategy import AdaptiveStrategy
+from base.adaptive_strategy import DefaultAdaptiveStrategy
 from base.model import Model, ModelID
 from base.model_manager import ModelManager
 from base.model_trainer import DefaultModelTrainer
@@ -23,7 +23,7 @@ class ClusterManager:
         self._training_df: pd.DataFrame = pd.read_pickle(config.training_data_pickle_path)
         # TODO: make strategy configurable.
         #  extension idea: ClusterManager can change strategy at runtime, depending on the context
-        self._adaptive_strategy = AdaptiveStrategy(config, self._model_manager, self._model_trainer)
+        self._adaptive_strategy = DefaultAdaptiveStrategy(config, self._model_manager, self._model_trainer)
 
     def add_node(self, node_id: NodeID, threshold_metric: ThresholdMetric, data: pd.DataFrame = None) -> None:
         """

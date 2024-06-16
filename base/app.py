@@ -5,7 +5,7 @@ import pandas as pd
 from flask import request, send_file
 
 from base import app, config
-from base.adaptive_strategy import DefaultAdaptiveStrategy
+from base.base_adaptive_strategy import DefaultBaseStationAdaptiveStrategy
 from base.cluster_manager import ClusterManager
 from base.model_manager import ModelManager
 from base.model_trainer import DefaultModelTrainer
@@ -16,7 +16,7 @@ event_logger = config.event_logger
 
 model_manager = ModelManager(config)
 model_trainer = DefaultModelTrainer(epochs=2)
-adaptive_strategy = DefaultAdaptiveStrategy(config, model_manager, model_trainer)
+adaptive_strategy = DefaultBaseStationAdaptiveStrategy(config, model_manager, model_trainer)
 cluster_manager = ClusterManager(config, model_manager, model_trainer, adaptive_strategy)
 
 

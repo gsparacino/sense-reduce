@@ -10,7 +10,7 @@ from sensor.base_station_gateway import BaseStationGateway
 from sensor.model_manager import ModelManager
 
 
-class AdaptiveStrategy(ABC):
+class SensorNodeAdaptiveStrategy(ABC):
 
     @abstractmethod
     def is_violation(self, measurement: np.array, prediction: np.array) -> bool:
@@ -34,7 +34,7 @@ class AdaptiveStrategy(ABC):
         pass
 
 
-class DefaultAdaptiveStrategy(AdaptiveStrategy):
+class DefaultSensorNodeAdaptiveStrategy(SensorNodeAdaptiveStrategy):
     def __init__(self,
                  threshold_metric: ThresholdMetric,
                  model_manager: ModelManager,

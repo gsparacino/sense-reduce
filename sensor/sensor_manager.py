@@ -7,9 +7,9 @@ import pandas as pd
 from abstract_sensor import AbstractSensor
 from common import Predictor
 from sensor.Violation import Violation
-from sensor.adaptive_strategy import AdaptiveStrategy
 from sensor.base_station_gateway import BaseStationGateway, NodeInitialization
 from sensor.model_manager import ModelManager
+from sensor.sensor_adaptive_strategy import SensorNodeAdaptiveStrategy
 
 NodeID = str
 
@@ -20,7 +20,7 @@ class SensorManager:
                  sensor: AbstractSensor,
                  base_station: BaseStationGateway,
                  model_manager: ModelManager,
-                 adaptive_strategy: AdaptiveStrategy,
+                 adaptive_strategy: SensorNodeAdaptiveStrategy,
                  node_initialization: NodeInitialization,
                  prediction_interval: float,
                  ) -> None:

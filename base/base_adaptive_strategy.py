@@ -13,7 +13,7 @@ from base.node_manager import NodeManager, NodeID
 from common import ModelMetadata
 
 
-class AdaptiveStrategy(ABC):
+class BaseStationAdaptiveStrategy(ABC):
 
     @abstractmethod
     def get_recommended_models(self, node: NodeManager, cluster_nodes: List[NodeManager]) -> List[ModelID]:
@@ -38,7 +38,7 @@ class AdaptiveStrategy(ABC):
         pass
 
 
-class DefaultAdaptiveStrategy(AdaptiveStrategy):
+class DefaultBaseStationAdaptiveStrategy(BaseStationAdaptiveStrategy):
 
     def __init__(self, config: Config, model_manager: ModelManager, model_trainer: ModelTrainer):
         self._config = config

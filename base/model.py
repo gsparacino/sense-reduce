@@ -57,7 +57,7 @@ class Model(PredictionModel):
         convert_datetime(x, self.metadata.periodicity)
         x_np = self._normalize_input_features(x).values.reshape((1, self.metadata.input_length, -1))
 
-        return self._model_output_to_dataframe(self.model.predict(x_np), x.index.max())
+        return self._model_output_to_dataframe(self.model.predict(x_np), x.index.max_ts())
 
     def _normalize_input_features(self, x: pd.DataFrame) -> pd.DataFrame:
         x[self.metadata.input_features] = (x[self.metadata.input_features] - self.metadata.input_normalization_mean) \

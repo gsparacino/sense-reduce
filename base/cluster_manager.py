@@ -5,7 +5,7 @@ from typing import List
 import pandas as pd
 
 from base import Config
-from base.adaptive_strategy import AdaptiveStrategy
+from base.base_adaptive_strategy import BaseStationAdaptiveStrategy
 from base.model import Model, ModelID
 from base.model_manager import ModelManager
 from base.model_trainer import ModelTrainer
@@ -19,7 +19,7 @@ class ClusterManager:
                  config: Config,
                  model_manager: ModelManager,
                  model_trainer: ModelTrainer,
-                 adaptive_strategy: AdaptiveStrategy
+                 adaptive_strategy: BaseStationAdaptiveStrategy
                  ):
         self._nodes: dict[NodeID, NodeManager] = {}
         self._model_manager = model_manager

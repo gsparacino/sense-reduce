@@ -53,7 +53,7 @@ class NodeManager:
         dt_start = dt - timedelta(minutes=1)
         data = self._data_storage.get_measurements_between(dt_start, dt)
         predictions = self.model.predict(data)
-        last_ts = data.index.max()
+        last_ts = data.index.max_ts()
         predictions.loc[last_ts] = data.loc[last_ts, self.model.metadata.output_features]
         predictions.sort_index(inplace=True)
         self._prediction_horizon = PredictionHorizon(predictions)

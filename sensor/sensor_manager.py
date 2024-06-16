@@ -5,10 +5,10 @@ import time
 import pandas as pd
 
 from abstract_sensor import AbstractSensor
-from common import ThresholdMetric, Predictor
+from common import Predictor
 from sensor.Violation import Violation
 from sensor.adaptive_strategy import AdaptiveStrategy
-from sensor.base_station_gateway import BaseStationGateway
+from sensor.base_station_gateway import BaseStationGateway, NodeInitialization
 from sensor.model_manager import ModelManager
 
 NodeID = str
@@ -17,40 +17,30 @@ NodeID = str
 class SensorManager:
 
     def __init__(self,
-                 node_id: NodeID,
                  sensor: AbstractSensor,
-                 predictor: Predictor,
-                 base_station_gateway: BaseStationGateway,
+                 base_station: BaseStationGateway,
                  model_manager: ModelManager,
-                 threshold_metric: ThresholdMetric,
-                 cooldown: float,
+                 adaptive_strategy: AdaptiveStrategy,
+                 node_initialization: NodeInitialization,
+                 prediction_interval: float,
                  ) -> None:
         """
         Manages a sensor's measurements and prediction models, as well as handling coordination with the Base Station.
 
-        :param node_id: The node id of the sensor node
         :param sensor: An implementation of AbstractSensor that provides measurements.
-        :param predictor: An instance of Predictor that takes measurements as inputs and provides predictions.
-        :param base_station_gateway: An instance of BaseStationGateway that handles coordination with the Base Station.
+        :param base_station: An instance of BaseStationGateway that handles coordination with the Base Station.
         :param model_manager: An instance of ModelManager that manages the local portfolio of models.
-        :param threshold_metric: A metric implementation that defines a threshold violation.
-        :param cooldown: The minimum time interval between consecutive violations to which the sensor should react.
+        :param adaptive_strategy: An instance of AdaptiveStrategy that implements the adaptation logic of the sensor.
+        :param node_initialization: An instance of NodeInitialization with the node's initial configuration.
         """
         logging.debug(f"Initializing SensorManager")
-        assert cooldown > 0, "cooldown must be greater than 0."
 
-        self.node_id = node_id
+        self.node_id = node_initialization.node_id
         self.sensor: AbstractSensor = sensor
-        self.predictor: Predictor = predictor
         self.model_manager: ModelManager = model_manager
-        self.base_station_gateway: BaseStationGateway = base_station_gateway
-        self._adaptive_strategy = (
-            AdaptiveStrategy(
-                threshold_metric, model_manager, base_station_gateway,
-                datetime.timedelta(seconds=cooldown)
-            )
-        )
-        self._threshold_metric = threshold_metric
+        self.base_station: BaseStationGateway = base_station
+        self.adaptive_strategy = adaptive_strategy
+        self.predictor: Predictor = self._init_predictor(prediction_interval, node_initialization)
 
     def run(self, time_interval: float) -> None:
         """Starts monitoring the sensor, coordinating with the Base Station by sending data notifying violations.
@@ -74,9 +64,9 @@ class SensorManager:
             prediction_array = prediction.to_numpy()
             self.predictor.add_prediction(timestamp, prediction_array)
 
-            if self._adaptive_strategy.is_violation(measurements_array, prediction_array):
+            if self.adaptive_strategy.is_violation(measurements_array, prediction_array):
                 violation = Violation(node_id, timestamp, self.predictor, measurements_array, prediction_array)
-                self.predictor = self._adaptive_strategy.handle_violation(violation)
+                self.predictor = self.adaptive_strategy.handle_violation(violation)
 
             time.sleep(time_interval)
 
@@ -94,3 +84,11 @@ class SensorManager:
             logging.warning(f'{now} - Failed reading measurement from sensor. Retrying...')
             measurement = self.sensor.measurement
         return measurement, now
+
+    def _init_predictor(self, prediction_interval: float, node_initialization: NodeInitialization) -> Predictor:
+        self.model_manager.synchronize_models(node_initialization.portfolio)
+        current_model = self.model_manager.get_model(node_initialization.current_model)
+        period = datetime.timedelta(seconds=prediction_interval)
+        predictor = Predictor(current_model, node_initialization.data_storage, period)
+        predictor.update_prediction_horizon(datetime.datetime.now())
+        return predictor

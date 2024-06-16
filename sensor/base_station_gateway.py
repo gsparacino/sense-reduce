@@ -11,7 +11,8 @@ from common import DataStorage, ModelMetadata
 
 
 class NodeInitialization:
-    def __init__(self, current_model: ModelMetadata, data_storage: DataStorage, portfolio: list[str]):
+    def __init__(self, node_id: str, current_model: ModelMetadata, data_storage: DataStorage, portfolio: list[str]):
+        self.node_id: str = node_id
         self.current_model: ModelMetadata = current_model
         self.data_storage: DataStorage = data_storage
         self.portfolio: list[str] = portfolio
@@ -63,7 +64,7 @@ class BaseStationGateway:
         initial_df = self._extract_initial_df(response, model_metadata)
         portfolio = self._extract_models_portfolio(response)
 
-        return NodeInitialization(model_metadata, initial_df, portfolio)
+        return NodeInitialization(node_id, model_metadata, initial_df, portfolio)
 
     def send_measurement(self, node_id: str, dt: datetime.datetime, measurement: np.ndarray) -> None:
         """

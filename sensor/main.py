@@ -7,8 +7,9 @@ import uuid
 
 import requests
 
-from common import Predictor, ThresholdMetric, L2Threshold
+from common import ThresholdMetric, L2Threshold
 from sensor.abstract_sensor import AbstractSensor
+from sensor.adaptive_strategy import AdaptiveStrategy
 from sensor.base_station_gateway import BaseStationGateway
 from sensor.model_manager import ModelManager
 from sensor.sensor_manager import SensorManager
@@ -61,16 +62,16 @@ def run(threshold_metric: ThresholdMetric,
 
     elif data_reduction_mode == 'predict':
         node_initialization = base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_interval)
-        model_manager.synchronize_models(node_initialization.portfolio)
-        current_model = model_manager.get_model(node_initialization.current_model)
 
-        # TODO: move Predictor initialization into sensor_manager
-        period = datetime.timedelta(seconds=prediction_interval)
-        predictor = Predictor(current_model, node_initialization.data_storage, period)
-        predictor.update_prediction_horizon(datetime.datetime.now())
+        # TODO: make strategy configurable
+        adaptive_strategy = (
+            AdaptiveStrategy(threshold_metric, model_manager, base_station, datetime.timedelta(seconds=cooldown))
+        )
 
         sensor_manager = (
-            SensorManager(NODE_ID, sensor, predictor, base_station, model_manager, threshold_metric, cooldown)
+            SensorManager(
+                sensor, base_station, model_manager, adaptive_strategy, node_initialization, prediction_interval
+            )
         )
         sensor_manager.run(time_interval)
     else:

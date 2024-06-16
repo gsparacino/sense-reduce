@@ -5,25 +5,28 @@ from typing import List
 import pandas as pd
 
 from base import Config
-from base.adaptive_strategy import DefaultAdaptiveStrategy
+from base.adaptive_strategy import AdaptiveStrategy
 from base.model import Model, ModelID
 from base.model_manager import ModelManager
-from base.model_trainer import DefaultModelTrainer
+from base.model_trainer import ModelTrainer
 from base.node_manager import NodeManager, NodeID
 from common import ThresholdMetric, ModelMetadata
 
 
 class ClusterManager:
 
-    def __init__(self, config: Config):
+    def __init__(self,
+                 config: Config,
+                 model_manager: ModelManager,
+                 model_trainer: ModelTrainer,
+                 adaptive_strategy: AdaptiveStrategy
+                 ):
         self._nodes: dict[NodeID, NodeManager] = {}
-        self._model_manager = ModelManager(config)
-        # TODO: make ModelTrainer configurable
-        self._model_trainer = DefaultModelTrainer(epochs=2)
+        self._model_manager = model_manager
+        self._model_trainer = model_trainer
         self._training_df: pd.DataFrame = pd.read_pickle(config.training_data_pickle_path)
-        # TODO: make strategy configurable.
-        #  extension idea: ClusterManager can change strategy at runtime, depending on the context
-        self._adaptive_strategy = DefaultAdaptiveStrategy(config, self._model_manager, self._model_trainer)
+        # TODO: extension idea -> ClusterManager can change strategy at runtime, depending on the context
+        self._adaptive_strategy = adaptive_strategy
 
     def add_node(self, node_id: NodeID, threshold_metric: ThresholdMetric, data: pd.DataFrame = None) -> None:
         """

@@ -5,13 +5,19 @@ import pandas as pd
 from flask import request, send_file
 
 from base import app, config
+from base.adaptive_strategy import DefaultAdaptiveStrategy
 from base.cluster_manager import ClusterManager
+from base.model_manager import ModelManager
+from base.model_trainer import DefaultModelTrainer
 from common import ThresholdMetric, LogEvent, LogEventType
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 event_logger = config.event_logger
 
-cluster_manager = ClusterManager(config)
+model_manager = ModelManager(config)
+model_trainer = DefaultModelTrainer(epochs=2)
+adaptive_strategy = DefaultAdaptiveStrategy(config, model_manager, model_trainer)
+cluster_manager = ClusterManager(config, model_manager, model_trainer, adaptive_strategy)
 
 
 @app.post("/nodes")

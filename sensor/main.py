@@ -50,18 +50,19 @@ def run(threshold_metric: ThresholdMetric,
                  )
     base_station = BaseStationGateway(base_address)
     threshold_metric_to_dict = threshold_metric.to_dict()
+    # TODO: make the model's path configurable
     model_manager = ModelManager(NODE_ID, 'models', base_station)  # TODO: make the model's path configurable
 
     if data_reduction_mode == 'none':
         # TODO: use NodeManager anyway
-        base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_interval)
+        base_station.register_node(NODE_ID, threshold_metric_to_dict)
         while True:
             current_time = datetime.datetime.now()
             base_station.send_measurement(NODE_ID, current_time, sensor.measurement.values)
             time.sleep(time_interval)
 
     elif data_reduction_mode == 'predict':
-        node_initialization = base_station.register_node(NODE_ID, threshold_metric_to_dict, prediction_interval)
+        node_initialization = base_station.register_node(NODE_ID, threshold_metric_to_dict)
 
         # TODO: make strategy configurable
         adaptive_strategy = (

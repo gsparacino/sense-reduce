@@ -23,16 +23,6 @@ class ModelManager:
         self._load_local_models()
         self.base_model: Model = self.get_model(config.base_model_id)
 
-    # def clone_model(self, model: Model) -> Model:
-    #     """
-    #     Clones a model for the provided Node, using the provided model's metadata.
-    #
-    #     :param model: the model to clone
-    #     :return: the new model
-    #     """
-    #     model = clone_model(model)
-    #     self.save_model(model)
-    #     return model
     def get_all_models(self) -> List[ModelID]:
         """
         :return: the list of IDs of all available models.

@@ -36,14 +36,13 @@ class BaseStationGateway:
     def register_node(self,
                       node_id: str,
                       threshold_metric: dict,
-                      frequency: float) -> NodeInitialization:
+                      ) -> NodeInitialization:
         """
         Registers the sensor node with the base station by providing its ID and threshold metric. The Base Station may
         respond with the metadata of the model to fetch.
 
         :param node_id: ID of the sensor node, as a string.
         :param threshold_metric: The metric used to determine if a threshold has been reached, as a dict.
-        :param frequency: The interval in seconds between consecutive measurements, as a float.
 
         :return: A tuple with: an instance of common.ModelMetadata containing the model's metadata; an instance of
         common.DataStorage containing the initial data for the model.
@@ -52,7 +51,6 @@ class BaseStationGateway:
         """
         body = {
             'threshold_metric': threshold_metric,
-            'prediction_period_s': frequency,
             'node_id': node_id
         }
         logging.debug(f'Registering node {node_id} with base station at {self.base_address}: {body}')

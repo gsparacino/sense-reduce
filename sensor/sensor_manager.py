@@ -4,9 +4,9 @@ import time
 
 import pandas as pd
 
-from abstract_sensor import AbstractSensor
 from common import Predictor
 from sensor.Violation import Violation
+from sensor.abstract_sensor import AbstractSensor
 from sensor.base_station_gateway import BaseStationGateway, NodeInitialization
 from sensor.model_manager import ModelManager
 from sensor.sensor_adaptive_strategy import SensorNodeAdaptiveStrategy

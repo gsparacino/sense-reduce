@@ -1,5 +1,6 @@
 import datetime
 import logging
+from abc import ABC, abstractmethod
 from typing import Optional
 
 import numpy as np
@@ -18,21 +19,9 @@ class NodeInitialization:
         self.portfolio: list[str] = portfolio
 
 
-class BaseStationGateway:
-    def __init__(self, base_address: str):
-        """
-        A façade class that abstracts away all communications with the Base Station.
+class BaseStationGateway(ABC):
 
-        :param base_address: The HTTP url of the Base Station.
-        """
-        logging.debug(f"Initializing BaseStationGateway with base address: {base_address}")
-        self.base_address = base_address
-        response = requests.get(f'{self.base_address}/ping')
-        if not response.ok:
-            raise RequestException(
-                f'Base Station is unreachable. GET {self.base_address}/ping returned {response.status_code}'
-            )
-
+    @abstractmethod
     def register_node(self,
                       node_id: str,
                       threshold_metric: dict,
@@ -46,24 +35,10 @@ class BaseStationGateway:
 
         :return: A tuple with: an instance of common.ModelMetadata containing the model's metadata; an instance of
         common.DataStorage containing the initial data for the model.
-
-        :raises requests.RequestException: An error occurred while registering the node with the Base Station.
         """
-        body = {
-            'threshold_metric': threshold_metric,
-            'node_id': node_id
-        }
-        logging.debug(f'Registering node {node_id} with base station at {self.base_address}: {body}')
-        response = requests.post(f'{self.base_address}/nodes', json=body)
-        if not response.ok:
-            raise RequestException(f'POST {self.base_address}/nodes returned {response.status_code}')
+        pass
 
-        model_metadata = self._extract_model_metadata(response)
-        initial_df = self._extract_initial_df(response, model_metadata)
-        portfolio = self._extract_models_portfolio(response)
-
-        return NodeInitialization(node_id, model_metadata, initial_df, portfolio)
-
+    @abstractmethod
     def send_measurement(self, node_id: str, dt: datetime.datetime, measurement: np.ndarray) -> None:
         """
         Sends a single measurement to the Base Station.
@@ -71,18 +46,10 @@ class BaseStationGateway:
         :param node_id: The node's unique ID.
         :param dt: The measurement's timestamp, as a datetime object.
         :param measurement: The measurement data, as a NumPy array.
-
-        :raises requests.RequestException: An error occurred while sending the measurement.
         """
-        body = {
-            'timestamp': dt.isoformat(),
-            'measurement': list(measurement),
-        }
-        logging.debug(f'Node {node_id} sending measurement: {body}')
-        response = requests.post(f'{self.base_address}/measurement/{node_id}', json=body)
-        if not response.ok:
-            raise RequestException(f'POST {self.base_address}/measurement/{node_id} returned {response.status_code}')
+        pass
 
+    @abstractmethod
     def fetch_model_bytes(self, node_id: str, model_id: str) -> bytes:
         """Fetches a specific prediction model from the Base Station.
 
@@ -90,18 +57,10 @@ class BaseStationGateway:
         :param model_id: ID of the model to fetch, as a string.
 
         :return: The bytes containing the prediction model.
-
-        :raises requests.RequestException: An error occurred while fetching the model.
         """
-        logging.debug(f'Fetching model {model_id} from Base Station')
-        r = requests.get(f'{self.base_address}/nodes/{node_id}/models/{model_id}')
-        if not r.ok:
-            raise RequestException(
-                f'GET {self.base_address}/nodes/{node_id}/models/{model_id} returned {r.status_code}'
-            )
+        pass
 
-        return r.content
-
+    @abstractmethod
     def fetch_model_metadata(self, node_id: str, model_id: str) -> ModelMetadata:
         """Fetches a specific prediction model's metadata from the Base Station.
 
@@ -109,20 +68,10 @@ class BaseStationGateway:
         :param model_id: ID of the model to fetch, as a string.
 
         :return: The ModelMetadata of the model.
-
-        :raises requests.RequestException: An error occurred while fetching the model.
         """
-        logging.debug(f'Fetching model {model_id} metadata from Base Station')
-        r = requests.get(f'{self.base_address}/nodes/{node_id}/models/{model_id}/metadata')
-        if not r.ok:
-            raise RequestException(
-                f'GET {self.base_address}/nodes/{node_id}/models/{model_id}/metadata returned {r.status_code}'
-            )
+        pass
 
-        metadata = ModelMetadata.from_dict(r.json())
-
-        return metadata
-
+    @abstractmethod
     def synchronize(self,
                     node_id: str,
                     dt: datetime.datetime,
@@ -141,9 +90,101 @@ class BaseStationGateway:
 
         :return: A list of common.ModelMetadata, containing the metadata of the models that the sensor could fetch from
         the base station.
-
-        :raises requests.RequestException: An error occurred while sending the request.
         """
+        pass
+
+    @abstractmethod
+    def send_violation(self, node_id: str,
+                       dt: datetime.datetime,
+                       measurements: pd.DataFrame,
+                       model_id: str,
+                       portfolio: list[str],
+                       request_new_model: bool = False) -> list[str]:
+        """
+        Notifies a violation on the Base Station.
+
+        :param node_id: the node's unique ID
+        :param dt: the timestamp of the violation event, as a datetime object.
+        :param measurements: the measurements that caused the violation, as a NumPy array.
+        :param model_id: the ID of the model currently active on the node, as a string.
+        :param portfolio: the list of models currently stored in the node.
+        :param request_new_model: If true, the node will ask the base station to send a new model on the next update
+        """
+        pass
+
+
+class HttpBaseStationGateway(BaseStationGateway):
+    def __init__(self, base_address: str):
+        """
+        A façade class that abstracts away all communications with the Base Station.
+
+        :param base_address: The HTTP url of the Base Station.
+        """
+        logging.debug(f"Initializing BaseStationGateway with base address: {base_address}")
+        self.base_address = base_address
+        response = requests.get(f'{self.base_address}/ping')
+        if not response.ok:
+            raise RequestException(
+                f'Base Station is unreachable. GET {self.base_address}/ping returned {response.status_code}'
+            )
+
+    def register_node(self,
+                      node_id: str,
+                      threshold_metric: dict,
+                      ) -> NodeInitialization:
+        body = {
+            'threshold_metric': threshold_metric,
+            'node_id': node_id
+        }
+        logging.debug(f'Registering node {node_id} with base station at {self.base_address}: {body}')
+        response = requests.post(f'{self.base_address}/nodes', json=body)
+        if not response.ok:
+            raise RequestException(f'POST {self.base_address}/nodes returned {response.status_code}')
+
+        model_metadata = self._extract_model_metadata(response)
+        initial_df = self._extract_initial_df(response, model_metadata)
+        portfolio = self._extract_models_portfolio(response)
+
+        return NodeInitialization(node_id, model_metadata, initial_df, portfolio)
+
+    def send_measurement(self, node_id: str, dt: datetime.datetime, measurement: np.ndarray) -> None:
+        body = {
+            'timestamp': dt.isoformat(),
+            'measurement': list(measurement),
+        }
+        logging.debug(f'Node {node_id} sending measurement: {body}')
+        response = requests.post(f'{self.base_address}/measurement/{node_id}', json=body)
+        if not response.ok:
+            raise RequestException(f'POST {self.base_address}/measurement/{node_id} returned {response.status_code}')
+
+    def fetch_model_bytes(self, node_id: str, model_id: str) -> bytes:
+        logging.debug(f'Fetching model {model_id} from Base Station')
+        r = requests.get(f'{self.base_address}/nodes/{node_id}/models/{model_id}')
+        if not r.ok:
+            raise RequestException(
+                f'GET {self.base_address}/nodes/{node_id}/models/{model_id} returned {r.status_code}'
+            )
+
+        return r.content
+
+    def fetch_model_metadata(self, node_id: str, model_id: str) -> ModelMetadata:
+        logging.debug(f'Fetching model {model_id} metadata from Base Station')
+        r = requests.get(f'{self.base_address}/nodes/{node_id}/models/{model_id}/metadata')
+        if not r.ok:
+            raise RequestException(
+                f'GET {self.base_address}/nodes/{node_id}/models/{model_id}/metadata returned {r.status_code}'
+            )
+
+        metadata = ModelMetadata.from_dict(r.json())
+
+        return metadata
+
+    def synchronize(self,
+                    node_id: str,
+                    dt: datetime.datetime,
+                    model_id: str,
+                    measurements: pd.DataFrame
+                    ) -> Optional[list[str]]:
         body = {
             'timestamp': dt.isoformat(),
             'measurements': measurements.to_json(),

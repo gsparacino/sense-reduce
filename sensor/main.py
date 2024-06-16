@@ -9,7 +9,7 @@ import requests
 
 from common import ThresholdMetric, L2Threshold
 from sensor.abstract_sensor import AbstractSensor
-from sensor.base_station_gateway import BaseStationGateway
+from sensor.base_station_gateway import HttpBaseStationGateway
 from sensor.model_manager import ModelManager
 from sensor.sensor_adaptive_strategy import DefaultSensorNodeAdaptiveStrategy
 from sensor.sensor_manager import SensorManager
@@ -48,7 +48,7 @@ def run(threshold_metric: ThresholdMetric,
     logging.info(f'Starting sensor node with ID={NODE_ID} in "{data_reduction_mode}" mode, '
                  f'threshold={threshold_metric} and base={base_address}...'
                  )
-    base_station = BaseStationGateway(base_address)
+    base_station = HttpBaseStationGateway(base_address)
     threshold_metric_to_dict = threshold_metric.to_dict()
     # TODO: make the model's path configurable
     model_manager = ModelManager(NODE_ID, 'models', base_station)  # TODO: make the model's path configurable

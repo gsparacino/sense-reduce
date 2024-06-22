@@ -9,10 +9,9 @@ from base.base_adaptive_strategy import DefaultBaseStationAdaptiveStrategy
 from base.cluster_manager import ClusterManager
 from base.model_manager import ModelManager
 from base.model_trainer import DefaultModelTrainer
-from common import ThresholdMetric, LogEvent, LogEventType
+from common import ThresholdMetric
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
-event_logger = config.event_logger
 
 model_manager = ModelManager(config)
 model_trainer = DefaultModelTrainer(epochs=2)
@@ -20,14 +19,14 @@ adaptive_strategy = DefaultBaseStationAdaptiveStrategy(config, model_manager, mo
 cluster_manager = ClusterManager(config, model_manager, model_trainer, adaptive_strategy)
 
 
+# TODO: implement POST /measurement
+
 @app.post("/nodes")
 def register_node():
     """Registers a new node and returns the model metadata and initial data for the node."""
     body: dict = request.get_json(force=True)
     node_id = body["node_id"]
     threshold_metric = ThresholdMetric.from_dict(body['threshold_metric'])
-
-    event_logger.log_event(LogEvent(node_id, LogEventType.REGISTRATION))
 
     cluster_manager.add_node(node_id, threshold_metric)
     model = cluster_manager.get_current_model(node_id)
@@ -64,7 +63,6 @@ def post_violation(node_id: str):
 def get_model(node_id: str, model_id: str):
     logging.info(f'Node {node_id} requested model {model_id}')
     model_file_path = cluster_manager.get_model_upload_path(model_id)
-    event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_UPDATE, f"{model_id}"))
     return send_file(model_file_path)
 
 

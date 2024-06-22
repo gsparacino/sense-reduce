@@ -20,7 +20,7 @@ class Config(object):
                      f'training_data_pickle = {training_data_pickle}, '
                      f'log_level = {log_level}'
                      )
-        self.event_logger = EventLogger(os.path.join(BASEDIR, log_dir))
+        self.event_logger = EventLogger(log_dir)
         self.model_dir = os.path.join(BASEDIR, model_dir)
         self.data_dir = os.path.join(BASEDIR, data_dir)
         self.base_model_id = base_model_id

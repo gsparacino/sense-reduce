@@ -77,6 +77,8 @@ class DefaultSensorNodeAdaptiveStrategy(SensorNodeAdaptiveStrategy):
             if new_predictor is not None:
                 logging.debug(f"Switching to new model: {new_predictor.model_id}")
                 self._latest_model_switch_timestamp = timestamp
+                measurements = predictor.get_measurements_in_current_prediction_horizon(timestamp)
+                base_station.synchronize(node_id, timestamp, new_predictor.model_id, measurements)
             else:
                 new_predictor = predictor
                 logging.debug(f"No suitable model found, requesting new model")

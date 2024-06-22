@@ -71,7 +71,7 @@ class ModelManager:
         model_name = metadata.model_id
         model = self._models.get(model_name)
         if model is None:
-            model_bytes: bytes = self._base_station.fetch_model_bytes(self.node_id, model_name)
+            model_bytes: bytes = self._base_station.get_model(self.node_id, model_name)
             model = self._save_model(model_bytes, metadata)
         return model
 
@@ -90,7 +90,7 @@ class ModelManager:
             self._delete_model(model_id)
         models_to_add = expected_models.difference(current_models)
         for model_id in models_to_add:
-            model_metadata = self._base_station.fetch_model_metadata(node_id=self.node_id, model_id=model_id)
+            model_metadata = self._base_station.get_model_metadata(node_id=self.node_id, model_id=model_id)
             self.add_model(model_metadata)
 
     def _delete_model(self, model_name: str) -> None:

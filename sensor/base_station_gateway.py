@@ -50,7 +50,7 @@ class BaseStationGateway(ABC):
         pass
 
     @abstractmethod
-    def fetch_model_bytes(self, node_id: str, model_id: str) -> bytes:
+    def get_model(self, node_id: str, model_id: str) -> bytes:
         """Fetches a specific prediction model from the Base Station.
 
         :param node_id: ID of the sensor node, as a string.
@@ -61,7 +61,7 @@ class BaseStationGateway(ABC):
         pass
 
     @abstractmethod
-    def fetch_model_metadata(self, node_id: str, model_id: str) -> ModelMetadata:
+    def get_model_metadata(self, node_id: str, model_id: str) -> ModelMetadata:
         """Fetches a specific prediction model's metadata from the Base Station.
 
         :param node_id: ID of the sensor node, as a string.
@@ -157,7 +157,7 @@ class HttpBaseStationGateway(BaseStationGateway):
         if not response.ok:
             raise RequestException(f'POST {self.base_address}/measurement/{node_id} returned {response.status_code}')
 
-    def fetch_model_bytes(self, node_id: str, model_id: str) -> bytes:
+    def get_model(self, node_id: str, model_id: str) -> bytes:
         logging.debug(f'Fetching model {model_id} from Base Station')
         r = requests.get(f'{self.base_address}/nodes/{node_id}/models/{model_id}')
         if not r.ok:
@@ -167,7 +167,7 @@ class HttpBaseStationGateway(BaseStationGateway):
 
         return r.content
 
-    def fetch_model_metadata(self, node_id: str, model_id: str) -> ModelMetadata:
+    def get_model_metadata(self, node_id: str, model_id: str) -> ModelMetadata:
         logging.debug(f'Fetching model {model_id} metadata from Base Station')
         r = requests.get(f'{self.base_address}/nodes/{node_id}/models/{model_id}/metadata')
         if not r.ok:

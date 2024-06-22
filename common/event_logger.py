@@ -8,12 +8,13 @@ from pathlib import Path
 
 class LogEventType(Enum):
     REGISTRATION = auto(),
-    MODEL_UPDATE = auto(),
+    MODEL_SEND = auto(),
+    MODEL_SWITCH = auto(),
     VIOLATION = auto(),
-    HORIZON_UPDATE = auto(),
+    PORTFOLIO_SYNC = auto(),
     MEASUREMENT = auto(),
-    PREDICTION = auto(),
-    MODEL_TRAIN = auto()
+    MODEL_TRAIN = auto(),
+    MODEL_READY = auto()
 
 
 class LogEvent(object):
@@ -52,11 +53,11 @@ class EventLogger(object):
             with open(path, mode='w', newline='') as file:
                 writer = csv.DictWriter(file, fieldnames=header)
                 writer.writeheader()
-                self._path = path
+                self.log_file = path
 
     def log_event(self, event: LogEvent) -> None:
-        if self._path is not None:
+        if self.log_file is not None:
             entry = [datetime.datetime.now(), event.node_id, event.event.name, event.details]
-            with open(self._path, mode='a', newline='') as file:
+            with open(self.log_file, mode='a', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(entry)

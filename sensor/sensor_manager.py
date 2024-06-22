@@ -42,14 +42,16 @@ class SensorManager:
         self.adaptive_strategy = adaptive_strategy
         self.predictor: Predictor = self._init_predictor(prediction_interval, node_initialization)
 
-    def run(self, time_interval: float) -> None:
+    def run(self, time_interval: float, shutdown_dt: datetime.datetime = None) -> None:
         """Starts monitoring the sensor, coordinating with the Base Station by sending data notifying violations.
         """
         assert time_interval > 0, "time_interval must be greater than 0."
 
         node_id = self.node_id
 
-        while True:
+        logging.debug(f"Sensor {node_id} started @ {datetime.datetime.now()}")
+
+        while datetime.datetime.now() < shutdown_dt if shutdown_dt is not None else True:
             measurement, timestamp = self._get_measurement()
             logging.debug(f"Measurement @ {timestamp}: {measurement.values}")
 
@@ -69,6 +71,8 @@ class SensorManager:
                 self.predictor = self.adaptive_strategy.handle_violation(violation)
 
             time.sleep(time_interval)
+
+        logging.debug(f"Sensor {node_id} stopped @ {datetime.datetime.now()}")
 
     def _get_prediction(self, timestamp: datetime.datetime):
         predictor = self.predictor

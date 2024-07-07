@@ -5,9 +5,9 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from common import ThresholdMetric, Predictor
-from sensor.Violation import Violation
 from sensor.base_station_gateway import BaseStationGateway
 from sensor.model_manager import ModelManager
+from sensor.violation import Violation
 
 
 class SensorNodeAdaptiveStrategy(ABC):
@@ -40,12 +40,15 @@ class DefaultSensorNodeAdaptiveStrategy(SensorNodeAdaptiveStrategy):
                  model_manager: ModelManager,
                  base_station: BaseStationGateway,
                  cooldown: datetime.timedelta,
+                 consecutive_violations_limit: int = 0,
                  ):
         self.threshold_metric = threshold_metric
         self.model_manager: ModelManager = model_manager
         self.base_station: BaseStationGateway = base_station
         self.cooldown = cooldown
-        self._latest_model_switch_timestamp = None
+        self._latest_model_switch_timestamp = datetime.datetime.now()
+        self._consecutive_violations = 0
+        self.consecutive_violations_limit = consecutive_violations_limit
 
     def is_violation(self, measurement: np.array, prediction: np.array) -> bool:
         return self.threshold_metric.is_threshold_violation(measurement, prediction)
@@ -66,10 +69,14 @@ class DefaultSensorNodeAdaptiveStrategy(SensorNodeAdaptiveStrategy):
         prediction = violation.prediction
         predictor = violation.predictor
 
-        if self._not_in_cooldown(timestamp):
+        self._consecutive_violations += 1
+
+        if self._not_in_cooldown(timestamp) and self._consecutive_violations >= self.consecutive_violations_limit:
             logging.info(
-                f"Threshold violation: Measurement={measurement}, Prediction={prediction}"
+                f"Threshold violation ({self._consecutive_violations} / {self.consecutive_violations_limit}): "
+                f"Measurement={measurement}, Prediction={prediction}"
             )
+            predictor.log_violation(timestamp)
             new_predictor = model_manager.get_better_predictor(
                 threshold_metric, predictor, timestamp, measurement, prediction
             )
@@ -77,13 +84,13 @@ class DefaultSensorNodeAdaptiveStrategy(SensorNodeAdaptiveStrategy):
             if new_predictor is not None:
                 logging.debug(f"Switching to new model: {new_predictor.model_id}")
                 self._latest_model_switch_timestamp = timestamp
+                self._consecutive_violations = 0
                 measurements = predictor.get_measurements_in_current_prediction_horizon(timestamp)
                 base_station.synchronize(node_id, timestamp, new_predictor.model_id, measurements)
             else:
                 new_predictor = predictor
                 logging.debug(f"No suitable model found, requesting new model")
                 request_new_model = True
-                new_predictor.add_violation(timestamp)
             violation_measurement = predictor.get_measurement(timestamp)
             portfolio = model_manager.get_models_in_portfolio()
             models = base_station.send_violation(
@@ -93,8 +100,9 @@ class DefaultSensorNodeAdaptiveStrategy(SensorNodeAdaptiveStrategy):
             return new_predictor
         else:
             logging.debug(
-                f"Threshold violation happened within the cooldown period. Ignoring violations until "
-                f"{self._latest_model_switch_timestamp + self.cooldown}"
+                f"Threshold violation ignored." +
+                f" End of cooldown = {self._latest_model_switch_timestamp + self.cooldown}." +
+                f" Consecutive violations since last model switch = {self._consecutive_violations}."
             )
             return predictor
 

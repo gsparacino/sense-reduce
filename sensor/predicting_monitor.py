@@ -50,7 +50,7 @@ class PredictingMonitor:
                 prediction = p.get_prediction_at(now)
                 logging.debug(f"Prediction @ {now}: {prediction.values}")
 
-            p.add_prediction(now, prediction.to_numpy())
+            p.log_prediction(now, prediction.to_numpy())
 
             if threshold_metric.is_threshold_violation(measurement, prediction.to_numpy()):
                 logging.info(f"Threshold violation > Measurement={measurement.values}, Prediction={prediction.values}")

@@ -45,10 +45,6 @@ class NodeManager:
     def add_violation(self, dt: datetime, model_id: ModelID):
         self._data_storage.add_violation(dt, model_id)
 
-    def get_violations_of_model(self, model_id: ModelID) -> DataFrame:
-        violations = self._data_storage.get_violations()
-        return violations.loc[violations['model'] == model_id]
-
     def _update_prediction_horizon(self, dt: datetime) -> None:
         dt_start = dt - timedelta(minutes=1)
         data = self._data_storage.get_measurements_between(dt_start, dt)

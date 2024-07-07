@@ -8,6 +8,7 @@ import pandas as pd
 from .utils import to_full_hour, timestamps_before
 
 _MODEL_ID_COLUMN = 'model_id'
+_VIOLATION_FLAG_COLUMN = 'violation_flag'
 
 
 # TODO (long-term): this class should become a layer for accessing a time-series database (e.g., InfluxDB)
@@ -17,7 +18,8 @@ class DataStorage:
     def __init__(self, input_features: List[str], output_features: List[str]) -> None:
         self._measurements = pd.DataFrame(columns=input_features, dtype=np.float64)
         self._predictions = pd.DataFrame(columns=output_features, dtype=np.float64)
-        self._violations = pd.DataFrame(columns=[_MODEL_ID_COLUMN])
+        self._horizon = pd.DataFrame(columns=output_features, dtype=np.float64)
+        self._model_activity = pd.DataFrame(columns=[_MODEL_ID_COLUMN, _VIOLATION_FLAG_COLUMN])
 
     @property
     def mae(self) -> pd.Series:
@@ -100,25 +102,26 @@ class DataStorage:
     def add_measurement(self, dt: datetime.datetime, values: np.ndarray):
         self._measurements.loc[dt] = values
 
-    def add_prediction(self, dt: datetime.datetime, values: np.ndarray):
+    def add_prediction(self, model_id: str, dt: datetime.datetime, values: np.ndarray):
         self._predictions.loc[dt] = values
+        self._model_activity.loc[dt] = [model_id, False]
 
     def add_violation(self, dt: datetime.datetime, model_id: str):
-        self._violations.loc[dt] = model_id
+        self._model_activity.loc[dt] = [model_id, True]
 
     def add_measurement_dict(self, d: dict):
         for date_string, values in d.items():
             self.add_measurement(datetime.datetime.fromisoformat(date_string), values)
-
-    def add_prediction_dict(self, d: dict):
-        for date_string, values in d.items():
-            self.add_prediction(datetime.datetime.fromisoformat(date_string), values)
 
     def add_measurement_df(self, df: pd.DataFrame):
         self._measurements = pd.concat([self._measurements, df], copy=False)
 
     def add_prediction_df(self, df: pd.DataFrame):
         self._predictions = pd.concat([self._predictions, df], copy=False)
+
+    def update_horizon(self, df: pd.DataFrame):
+        previous_predictions = self._horizon[:df.index.min()]
+        self._horizon = pd.concat([previous_predictions, df], copy=False)
 
     def copy(self, deep=True) -> 'DataStorage':
         """Returns a deep copy of this object. Note that the csv_path is also equal unless changed afterwards."""
@@ -133,11 +136,11 @@ class DataStorage:
     def get_predictions(self) -> pd.DataFrame:
         return self._predictions
 
-    def get_violations(self) -> pd.DataFrame:
-        return self._violations
+    def get_model_activity(self) -> pd.DataFrame:
+        return self._model_activity
 
-    def get_violations_between(self, start: datetime.datetime, end: datetime.datetime) -> pd.DataFrame:
-        return self._violations[self._violations.between(start, end)]
+    def get_horizon(self) -> pd.DataFrame:
+        return self._horizon
 
     def get_previous_measurements(self,
                                   until_dt: datetime.datetime,
@@ -169,7 +172,10 @@ class DataStorage:
         :param dt_end: the end timestamp
         :return: a DataFrame of measurements between the provided start and end timestamps.
         """
-        return self._measurements.loc[dt_start:dt_end]
+        return self._measurements.loc[dt_start:dt_end].copy()
+
+    def get_measurements_since(self, dt_start: datetime.datetime) -> pd.DataFrame:
+        return self._measurements.loc[dt_start:].copy()
 
     def get_diff(self, columns: List[str] = None) -> pd.DataFrame:
         """Returns the difference between measurements and predictions. Removes NaNs."""

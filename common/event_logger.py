@@ -13,8 +13,7 @@ class LogEventType(Enum):
     VIOLATION = auto(),
     PORTFOLIO_SYNC = auto(),
     MEASUREMENT = auto(),
-    MODEL_TRAIN = auto(),
-    MODEL_READY = auto()
+    NEW_MODEL_REQUEST = auto()
 
 
 class LogEvent(object):

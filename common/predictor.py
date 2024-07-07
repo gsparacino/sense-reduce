@@ -47,9 +47,10 @@ class PredictionHorizon:
 class Predictor:
     """Uses a PredictionModel to provide predictions for arbitrary timestamps in the prediction range of the model."""
 
-    def __init__(self, model: PredictionModel, data: DataStorage, prediction_period: timedelta) -> None:
+    def __init__(self, model: PredictionModel, prediction_period: timedelta, data: DataStorage = None) -> None:
         self._model = model
-        self._data = data
+        self._data = data if data is not None \
+            else DataStorage(model.metadata.input_features, model.metadata.output_features)
         self._prediction_period_s = timedelta(seconds=prediction_period.seconds)
         self._prediction_horizon: Optional[PredictionHorizon] = None
 
@@ -90,8 +91,8 @@ class Predictor:
     def add_measurement_df(self, df: pd.DataFrame):
         self._data.add_measurement_df(df)
 
-    def add_prediction(self, dt: datetime, values: np.ndarray):
-        self._data.add_prediction(dt, values)
+    def log_prediction(self, dt: datetime, values: np.ndarray):
+        self._data.add_prediction(self.model_id, dt, values)
 
     def add_prediction_df(self, df: pd.DataFrame):
         self._data.add_prediction_df(df)
@@ -111,6 +112,30 @@ class Predictor:
         available.
         """
         return self._data.get_measurements_between(dt, dt)
+
+    def get_measurements_since(self, dt_start: datetime) -> pd.DataFrame:
+        """
+        :return: A pandas.DataFrame containing all the node's measurements since the specified datetime (inclusive).
+        """
+        return self._data.get_measurements_since(dt_start)
+
+    def get_predictions(self) -> pd.DataFrame:
+        """
+        :return: A pandas.DataFrame containing all the node's predictions.
+        """
+        return self._data.get_predictions()
+
+    def get_prediction_horizon(self) -> pd.DataFrame:
+        """
+        :return: A pandas.DataFrame containing all the values of the node's Prediction Horizon.
+        """
+        return self._data.get_horizon()
+
+    def get_model_activity(self) -> pd.DataFrame:
+        """
+        :return: A pandas.DataFrame containing all the node's active models over time.
+        """
+        return self._data.get_model_activity()
 
     def get_predictions_until(self, until: datetime) -> Optional[pd.DataFrame]:
         if self._prediction_horizon is None:
@@ -157,6 +182,7 @@ class Predictor:
         last_ts = previous_m.index.max()
         new_horizon.loc[last_ts] = previous_m.loc[last_ts, self.model_metadata.output_features]
         new_horizon.sort_index(inplace=True)
+        self._data.update_horizon(new_horizon)
 
         previous_ip = self._prediction_horizon
         self._prediction_horizon = PredictionHorizon(new_horizon)
@@ -165,12 +191,5 @@ class Predictor:
     def get_prediction_timedelta(self):
         return self._prediction_period_s
 
-    def add_violation(self, dt: datetime) -> None:
+    def log_violation(self, dt: datetime) -> None:
         self._data.add_violation(dt, self.model_id)
-
-    def get_latest_violation_datetime(self) -> Optional[datetime]:
-        violations = self._data.get_violations()
-        if violations.size > 0:
-            latest_violation = violations.tail(1)
-            return latest_violation.index[0]
-        return None

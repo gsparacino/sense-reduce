@@ -161,7 +161,7 @@ class ModelManager:
             model_id = model.metadata.model_id
             if model_id == current_predictor.model_id:
                 continue
-            predictor = Predictor(model, current_predictor.data, current_predictor.prediction_period)
+            predictor = Predictor(model, current_predictor.prediction_period, current_predictor.data)
             predictor.update_prediction_horizon(timestamp)
             prediction = predictor.get_prediction_at(timestamp).to_numpy()
             if threshold_metric.is_threshold_violation(measurements, prediction):

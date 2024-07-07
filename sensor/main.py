@@ -67,7 +67,7 @@ def run(threshold_metric: ThresholdMetric,
         # TODO: make strategy configurable
         adaptive_strategy = (
             DefaultSensorNodeAdaptiveStrategy(threshold_metric, model_manager, base_station,
-                                              datetime.timedelta(seconds=cooldown))
+                                              datetime.timedelta(seconds=cooldown), 3)
         )
 
         sensor_manager = (

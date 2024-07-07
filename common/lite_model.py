@@ -77,7 +77,6 @@ class LiteModel(PredictionModel):
 
         Args:
             input_df: a pandas DataFrame with DatetimeIndex
-            timedelta: the desired time gap between consecutive predictions
 
         Returns:
             A pandas DataFrame with DatetimeIndex

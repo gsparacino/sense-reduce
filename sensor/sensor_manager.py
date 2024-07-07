@@ -1,15 +1,16 @@
 import datetime
 import logging
 import time
+from typing import Optional
 
 import pandas as pd
 
-from common import Predictor
-from sensor.Violation import Violation
+from common import Predictor, DataStorage
 from sensor.abstract_sensor import AbstractSensor
 from sensor.base_station_gateway import BaseStationGateway, NodeInitialization
 from sensor.model_manager import ModelManager
 from sensor.sensor_adaptive_strategy import SensorNodeAdaptiveStrategy
+from sensor.violation import Violation
 
 NodeID = str
 
@@ -32,6 +33,7 @@ class SensorManager:
         :param model_manager: An instance of ModelManager that manages the local portfolio of models.
         :param adaptive_strategy: An instance of AdaptiveStrategy that implements the adaptation logic of the sensor.
         :param node_initialization: An instance of NodeInitialization with the node's initial configuration.
+        :param prediction_interval: The time interval between predictions.
         """
         logging.debug(f"Initializing SensorManager")
 
@@ -40,7 +42,12 @@ class SensorManager:
         self.model_manager: ModelManager = model_manager
         self.base_station: BaseStationGateway = base_station
         self.adaptive_strategy = adaptive_strategy
-        self.predictor: Predictor = self._init_predictor(prediction_interval, node_initialization)
+        self.node_initialization: NodeInitialization = node_initialization
+        self._initial_model = node_initialization.current_model
+        self._data_storage: DataStorage = DataStorage(self._initial_model.input_features,
+                                                      self._initial_model.output_features)
+        self.prediction_interval: float = prediction_interval
+        self.predictor: Optional[Predictor] = None
 
     def run(self, time_interval: float, shutdown_dt: datetime.datetime = None) -> None:
         """Starts monitoring the sensor, coordinating with the Base Station by sending data notifying violations.
@@ -56,28 +63,40 @@ class SensorManager:
             logging.debug(f"Measurement @ {timestamp}: {measurement.values}")
 
             measurements_array = measurement.to_numpy()
-            self.predictor.add_measurement(timestamp, measurements_array)
+            self._data_storage.add_measurement(timestamp, measurements_array)
 
-            if not self.predictor.in_prediction_horizon(timestamp):
-                self.predictor.update_prediction_horizon(timestamp)
-            prediction = self._get_prediction(timestamp)
-            logging.debug(f"Prediction by {self.predictor.model_id} @ {timestamp}: {prediction.values}")
+            if self._can_make_predictions():
+                predictor = self.predictor
+                if predictor is None:
+                    self.predictor = self._init_predictor(self.prediction_interval,
+                                                          self.node_initialization,
+                                                          self._data_storage)
+                if not predictor.in_prediction_horizon(timestamp):
+                    self._update_horizon(timestamp)
+                prediction = self._get_prediction(timestamp)
+                logging.debug(f"Prediction by {predictor.model_id} @ {timestamp}: {prediction.values}")
 
-            prediction_array = prediction.to_numpy()
-            self.predictor.add_prediction(timestamp, prediction_array)
+                prediction_array = prediction.to_numpy()
+                predictor.log_prediction(timestamp, prediction_array)
 
-            if self.adaptive_strategy.is_violation(measurements_array, prediction_array):
-                violation = Violation(node_id, timestamp, self.predictor, measurements_array, prediction_array)
-                self.predictor = self.adaptive_strategy.handle_violation(violation)
+                if self.adaptive_strategy.is_violation(measurements_array, prediction_array):
+                    predictor.log_violation(timestamp)
+                    violation = Violation(node_id, timestamp, predictor, measurements_array, prediction_array)
+                    self.predictor = self.adaptive_strategy.handle_violation(violation)
 
             time.sleep(time_interval)
 
         logging.debug(f"Sensor {node_id} stopped @ {datetime.datetime.now()}")
 
+    def _can_make_predictions(self):
+        return len(self._data_storage.get_measurements()) >= self._initial_model.input_length
+
+    def _update_horizon(self, timestamp):
+        self.predictor.update_prediction_horizon(timestamp)
+
     def _get_prediction(self, timestamp: datetime.datetime):
         predictor = self.predictor
         prediction = predictor.get_prediction_at(timestamp)
-        predictor.add_prediction(timestamp, prediction.to_numpy())
         return prediction
 
     def _get_measurement(self) -> (pd.Series, datetime):
@@ -89,10 +108,12 @@ class SensorManager:
             measurement = self.sensor.measurement
         return measurement, now
 
-    def _init_predictor(self, prediction_interval: float, node_initialization: NodeInitialization) -> Predictor:
+    def _init_predictor(self, prediction_interval: float,
+                        node_initialization: NodeInitialization,
+                        data_storage: DataStorage) -> Predictor:
         self.model_manager.synchronize_models(node_initialization.portfolio)
         current_model = self.model_manager.get_model(node_initialization.current_model)
         period = datetime.timedelta(seconds=prediction_interval)
-        predictor = Predictor(current_model, node_initialization.data_storage, period)
+        predictor = Predictor(current_model, period, data_storage)
         predictor.update_prediction_horizon(datetime.datetime.now())
         return predictor

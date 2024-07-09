@@ -80,22 +80,20 @@ class DefaultSensorNodeAdaptiveStrategy(SensorNodeAdaptiveStrategy):
             new_predictor = model_manager.get_better_predictor(
                 threshold_metric, predictor, timestamp, measurement, prediction
             )
-            request_new_model = False
             if new_predictor is not None:
                 logging.debug(f"Switching to new model: {new_predictor.model_id}")
                 self._latest_model_switch_timestamp = timestamp
                 self._consecutive_violations = 0
                 measurements = predictor.get_measurements_in_current_prediction_horizon(timestamp)
-                base_station.synchronize(node_id, timestamp, new_predictor.model_id, measurements)
+                models = base_station.synchronize(node_id, timestamp, new_predictor.model_id, measurements)
             else:
                 new_predictor = predictor
                 logging.debug(f"No suitable model found, requesting new model")
-                request_new_model = True
-            violation_measurements = predictor.get_measurements_in_current_prediction_horizon(timestamp)
-            portfolio = model_manager.get_models_in_portfolio()
-            models = base_station.send_violation(
-                node_id, timestamp, violation_measurements, predictor.model_id, portfolio, request_new_model
-            )
+                violation_measurements = predictor.get_measurements_in_current_prediction_horizon(timestamp)
+                portfolio = model_manager.get_models_in_portfolio()
+                models = base_station.send_violation(
+                    node_id, timestamp, violation_measurements, predictor.model_id, portfolio, True
+                )
             model_manager.synchronize_models(models)
             return new_predictor
         else:

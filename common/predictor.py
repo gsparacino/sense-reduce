@@ -51,7 +51,7 @@ class Predictor:
         self._model = model
         self._data = data if data is not None \
             else DataStorage(model.metadata.input_features, model.metadata.output_features)
-        self._prediction_period_s = timedelta(seconds=prediction_period.seconds)
+        self._prediction_period = timedelta(seconds=prediction_period.seconds)
         self._prediction_horizon: Optional[PredictionHorizon] = None
 
     @property
@@ -76,7 +76,7 @@ class Predictor:
 
     @property
     def prediction_period(self):
-        return self._prediction_period_s
+        return self._prediction_period
 
     def set_model(self, other: PredictionModel, start: datetime):
         """Changes the underlying model of the predictor and resets the prediction horizon to the specified datetime."""
@@ -98,11 +98,20 @@ class Predictor:
         self._data.add_prediction_df(df)
 
     def get_measurements_in_current_prediction_horizon(self, until: datetime) -> Optional[pd.DataFrame]:
-        """Returns the hourly measurements in the current horizon until the specified datetime (inclusive)."""
+        """Returns the measurements in the current horizon until the specified datetime (inclusive)."""
         if self._prediction_horizon is None:
             return None
         else:
             measurements = self._data.get_measurements_between(self.prediction_horizon_start, until)
+            return measurements
+
+    def get_reduced_measurements_in_current_prediction_horizon(self, until: datetime) -> Optional[pd.DataFrame]:
+        """Returns the reduced measurements in the current horizon until the specified datetime (inclusive)."""
+        if self._prediction_horizon is None:
+            return None
+        else:
+            since = self.prediction_horizon_start
+            measurements = self._data.get_reduced_measurements(since, until, self._prediction_period)
             return measurements
 
     def get_measurement(self, dt: datetime) -> Optional[pd.DataFrame]:
@@ -175,7 +184,7 @@ class Predictor:
 
         previous_m = self._data.get_previous_measurements(start,
                                                           self._model.metadata.input_length,
-                                                          self._prediction_period_s)
+                                                          self._prediction_period)
         new_horizon = self._model.predict(previous_m)
 
         # we also need the last measurement for interpolation
@@ -189,7 +198,7 @@ class Predictor:
         logging.debug(f'Updated prediction horizon from\n{previous_ip}\nto\n{self._prediction_horizon}')
 
     def get_prediction_timedelta(self):
-        return self._prediction_period_s
+        return self._prediction_period
 
     def log_violation(self, dt: datetime) -> None:
         self._data.add_violation(dt, self.model_id)

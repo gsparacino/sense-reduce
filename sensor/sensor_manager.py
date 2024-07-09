@@ -66,11 +66,11 @@ class SensorManager:
             self._data_storage.add_measurement(timestamp, measurements_array)
 
             if self._can_make_predictions():
-                predictor = self.predictor
-                if predictor is None:
+                if self.predictor is None:
                     self.predictor = self._init_predictor(self.prediction_interval,
                                                           self.node_initialization,
                                                           self._data_storage)
+                predictor = self.predictor
                 if not predictor.in_prediction_horizon(timestamp):
                     self._update_horizon(timestamp)
                 prediction = self._get_prediction(timestamp)
@@ -92,6 +92,8 @@ class SensorManager:
         return len(self._data_storage.get_measurements()) >= self._initial_model.input_length
 
     def _update_horizon(self, timestamp):
+        measurements = self.predictor.get_reduced_measurements_in_current_prediction_horizon(timestamp)
+        self.base_station.synchronize(self.node_id, timestamp, self.predictor.model_id, measurements)
         self.predictor.update_prediction_horizon(timestamp)
 
     def _get_prediction(self, timestamp: datetime.datetime):

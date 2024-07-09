@@ -19,7 +19,13 @@ adaptive_strategy = DefaultBaseStationAdaptiveStrategy(config, model_manager, mo
 cluster_manager = ClusterManager(config, model_manager, model_trainer, adaptive_strategy)
 
 
-# TODO: implement POST /measurement
+@app.post("/nodes/<string:node_id>/measurement")
+def add_measurement(node_id: str):
+    logging.info(f'Node {node_id} sent new measurements')
+    body = request.get_json(force=True)
+    measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
+    cluster_manager.add_measurements(node_id, measurements)
+
 
 @app.post("/nodes")
 def register_node():
@@ -34,7 +40,6 @@ def register_node():
 
     payload = dict()
     payload['model_metadata'] = model.metadata.to_dict()
-    payload['initial_df'] = initial_df.to_json()
     payload['portfolio'] = cluster_manager.get_recommended_models(node_id)
     logging.debug(f'Responding to new node with payload: {payload}')
     return payload

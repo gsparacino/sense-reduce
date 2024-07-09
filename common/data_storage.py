@@ -174,6 +174,20 @@ class DataStorage:
         """
         return self._measurements.loc[dt_start:dt_end].copy()
 
+    def get_reduced_measurements(self, dt_start: datetime.datetime, dt_end: datetime.datetime,
+                                 sampling_period: datetime.timedelta) -> pd.DataFrame:
+        """
+        Extracts samples from the provided time interval, by calculating the average values of the measurements between
+        the samples' timestamps.
+
+        :param dt_start: the start timestamp
+        :param dt_end: the end timestamp
+        :param sampling_period: the time interval, as a datetime.timedelta, between consecutive samples
+        :return: a DataFrame with samples extracted from the measurements in the provided time interval.
+        """
+        measurements = self.get_measurements_between(dt_start, dt_end)
+        return measurements.resample(f"{sampling_period.seconds}S").mean()
+
     def get_measurements_since(self, dt_start: datetime.datetime) -> pd.DataFrame:
         return self._measurements.loc[dt_start:].copy()
 

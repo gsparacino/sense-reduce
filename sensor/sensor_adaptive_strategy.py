@@ -91,10 +91,10 @@ class DefaultSensorNodeAdaptiveStrategy(SensorNodeAdaptiveStrategy):
                 new_predictor = predictor
                 logging.debug(f"No suitable model found, requesting new model")
                 request_new_model = True
-            violation_measurement = predictor.get_measurement(timestamp)
+            violation_measurements = predictor.get_measurements_in_current_prediction_horizon(timestamp)
             portfolio = model_manager.get_models_in_portfolio()
             models = base_station.send_violation(
-                node_id, timestamp, violation_measurement, predictor.model_id, portfolio, request_new_model
+                node_id, timestamp, violation_measurements, predictor.model_id, portfolio, request_new_model
             )
             model_manager.synchronize_models(models)
             return new_predictor

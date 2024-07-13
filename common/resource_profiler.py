@@ -22,44 +22,49 @@ if profile_log_path is not None:
     file = open(profile_log_path, 'a', newline='')
 
 
-def profiled(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        if profile_log_path is None:
-            return func(*args, **kwargs)
+def profiled(tag: str = None):
+    def inner(func):
+        func_name = func.__name__ if tag is None else tag
 
-        process = psutil.Process(os.getpid())
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if profile_log_path is None:
+                return func(*args, **kwargs)
 
-        start_cpu_times = process.cpu_times()
-        start_time = time.time()
-        timestamp = datetime.datetime.now()
-        tracemalloc.start()
+            process = psutil.Process(os.getpid())
 
-        result = func(*args, **kwargs)
+            start_cpu_times = process.cpu_times()
+            start_time = time.time()
+            timestamp = datetime.datetime.now()
+            tracemalloc.start()
 
-        current, peak_memory_usage = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
+            result = func(*args, **kwargs)
 
-        end_time = time.time()
-        end_cpu_times = process.cpu_times()
+            current, peak_memory_usage = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
 
-        total_cpu_time = (
-                end_cpu_times.user - start_cpu_times.user +
-                end_cpu_times.system - start_cpu_times.system +
-                end_cpu_times.children_user - start_cpu_times.children_user +
-                end_cpu_times.children_system - start_cpu_times.children_system
-        )
+            end_time = time.time()
+            end_cpu_times = process.cpu_times()
 
-        entry = [
-            timestamp,
-            func.__name__,
-            (end_time - start_time) * 1000,
-            total_cpu_time * 1000,
-            peak_memory_usage / (1024 ** 2)
-        ]
-        appender = csv.writer(file)
-        appender.writerow(entry)
+            total_cpu_time = (
+                    end_cpu_times.user - start_cpu_times.user +
+                    end_cpu_times.system - start_cpu_times.system +
+                    end_cpu_times.children_user - start_cpu_times.children_user +
+                    end_cpu_times.children_system - start_cpu_times.children_system
+            )
 
-        return result
+            entry = [
+                timestamp,
+                func_name,
+                round((end_time - start_time) * 1000, 2),
+                round(total_cpu_time * 1000, 2),
+                round(peak_memory_usage / (1024 ** 2), 2)
+            ]
+            appender = csv.writer(file)
+            appender.writerow(entry)
 
-    return wrapper
+            return result
+
+        return wrapper
+
+    return inner

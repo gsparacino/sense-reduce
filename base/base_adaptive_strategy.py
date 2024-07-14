@@ -11,6 +11,7 @@ from base.model_manager import ModelManager
 from base.model_trainer import ModelTrainer
 from base.node_manager import NodeManager, NodeID
 from common import ModelMetadata
+from common.resource_profiler import profiled
 
 
 class BaseStationAdaptiveStrategy(ABC):
@@ -81,6 +82,7 @@ class DefaultBaseStationAdaptiveStrategy(BaseStationAdaptiveStrategy):
             self._training_threads[node_id] = training_thread
             training_thread.start()
 
+    @profiled(tag="Train new model")
     def _train_new_model(self, model_metadata: ModelMetadata, data: pd.DataFrame = None) -> Model:
         """
         Trains a new model for the provided Node with the provided metadata, using the provided data as training set.

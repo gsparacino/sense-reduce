@@ -8,6 +8,7 @@ import numpy as np
 from common import ModelMetadata, PredictionModel, ThresholdMetric, Predictor
 from common.model_utils import save_model_as_tflite, load_model_tflite, delete_tflite_model, \
     get_model_dir_path
+from common.resource_profiler import profiled
 from sensor.base_station_gateway import BaseStationGateway
 
 
@@ -75,6 +76,7 @@ class ModelManager:
             model = self._save_model(model_bytes, metadata)
         return model
 
+    @profiled(tag="Portfolio update")
     def synchronize_models(self, model_ids: list[str]) -> None:
         """
         Updates the list of Sensor's models by removing local models that are not present in the provided list, and
@@ -104,6 +106,7 @@ class ModelManager:
             path = get_model_dir_path(self._model_dir, model_name)
             delete_tflite_model(path)
 
+    @profiled(tag="New model selection")
     def get_better_predictor(self, threshold_metric: ThresholdMetric,
                              current_predictor: Predictor,
                              timestamp: datetime.datetime,

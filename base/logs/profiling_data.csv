@@ -1,0 +1,5 @@
+timestamp,func,details,elapsed_time_ms,cpu_time_ms,peak_memory_usage_MB,received_data_B,transmitted_data_B
+2024-07-14 22:17:23.198187,ping,GET /ping ,0.0,0,0.0,0,4
+2024-07-14 22:17:23.203187,register_node,POST /nodes ,7.0,0,0.0,147,940
+2024-07-14 22:17:23.217187,get_model_metadata,GET /nodes/S1/models/zamg_vienna_2019_2019_simple_dense/metadata ,0.0,0,0.0,0,870
+2024-07-14 22:17:23.223187,get_model,GET /nodes/S1/models/zamg_vienna_2019_2019_simple_dense ,22.0,0,0.0,0,7716

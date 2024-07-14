@@ -8,13 +8,19 @@ import uuid
 import requests
 
 from common import ThresholdMetric, L2Threshold
+from common.resource_profiler import init_profiler
 from sensor.abstract_sensor import AbstractSensor
 from sensor.base_station_gateway import HttpBaseStationGateway
 from sensor.model_manager import ModelManager
 from sensor.sensor_adaptive_strategy import DefaultSensorNodeAdaptiveStrategy
 from sensor.sensor_manager import SensorManager
 
+BASEDIR = os.path.abspath(os.path.dirname(__file__))
 logging.basicConfig(level=logging.DEBUG)
+profile_log_path = os.getenv('PROFILE_LOG_PATH')
+
+if profile_log_path is not None:
+    init_profiler(os.path.join(BASEDIR, profile_log_path))
 
 
 def run(threshold_metric: ThresholdMetric,
@@ -63,6 +69,7 @@ def run(threshold_metric: ThresholdMetric,
 
     elif data_reduction_mode == 'predict':
         node_initialization = base_station.register_node(NODE_ID, threshold_metric_to_dict)
+        model_manager.synchronize_models(node_initialization.portfolio)
 
         # TODO: make strategy configurable
         adaptive_strategy = (

@@ -104,7 +104,7 @@ class BaseStationGateway(ABC):
 
         :param node_id: the node's unique ID
         :param dt: the timestamp of the violation event, as a datetime object.
-        :param measurements: the measurements that caused the violation, as a NumPy array.
+        :param measurements: the measurements that caused the violation, as a pd.DataFrame.
         :param model_id: the ID of the model currently active on the node, as a string.
         :param portfolio: the list of models currently stored in the node.
         :param request_new_model: If true, the node will ask the base station to send a new model on the next update
@@ -145,15 +145,16 @@ class HttpBaseStationGateway(BaseStationGateway):
 
         return NodeInitialization(node_id, model_metadata, portfolio)
 
-    def send_measurement(self, node_id: str, dt: datetime.datetime, measurement: np.ndarray) -> None:
+    def send_measurement(self, node_id: str, dt: datetime.datetime, measurement: pd.Series) -> None:
         body = {
             'timestamp': dt.isoformat(),
-            'measurement': list(measurement),
+            'measurement': measurement.to_json(),
         }
         logging.debug(f'Node {node_id} sending measurement: {body}')
-        response = requests.post(f'{self.base_address}/measurement/{node_id}', json=body)
+        response = requests.post(f'{self.base_address}/nodes/{node_id}/measurement', json=body)
         if not response.ok:
-            raise RequestException(f'POST {self.base_address}/measurement/{node_id} returned {response.status_code}')
+            raise RequestException(
+                f'POST {self.base_address}/nodes/{node_id}/measurement returned {response.status_code}')
 
     def get_model(self, node_id: str, model_id: str) -> bytes:
         logging.debug(f'Fetching model {model_id} from Base Station')

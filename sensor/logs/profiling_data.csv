@@ -1,2 +1,0 @@
-timestamp,func,details,elapsed_time_ms,cpu_time_ms,peak_memory_usage_MB,received_data_B,transmitted_data_B
-2024-07-14 22:17:23.213187,synchronize_models,Portfolio update,46.38,0.0,0.05,0,0

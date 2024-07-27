@@ -1,14 +1,9 @@
-import datetime
-import logging
 import os
 from typing import Optional
 
-import numpy as np
-
-from common import ModelMetadata, PredictionModel, ThresholdMetric, Predictor
+from common import ModelMetadata, PredictionModel
 from common.model_utils import save_model_as_tflite, load_model_tflite, delete_tflite_model, \
     get_model_dir_path
-from common.resource_profiler import profiled
 from sensor.base_station_gateway import BaseStationGateway
 
 
@@ -55,6 +50,13 @@ class ModelManager:
         model = self._models.get(model_name)
         return model
 
+    def get_models(self) -> dict[str, PredictionModel]:
+        """
+        :return: a dictionary of all available models in the Sensor's portfolio. The keys of the dictionary represent
+        the models' unique IDs.
+        """
+        return self._models
+
     def get_models_in_portfolio(self) -> list[str]:
         """
         :return: the list of IDs of all models in the portfolio.
@@ -76,7 +78,6 @@ class ModelManager:
             model = self._save_model(model_bytes, metadata)
         return model
 
-    @profiled(tag="Portfolio update")
     def synchronize_models(self, model_ids: list[str]) -> None:
         """
         Updates the list of Sensor's models by removing local models that are not present in the provided list, and
@@ -106,30 +107,6 @@ class ModelManager:
             path = get_model_dir_path(self._model_dir, model_name)
             delete_tflite_model(path)
 
-    @profiled(tag="New model selection")
-    def get_better_predictor(self, threshold_metric: ThresholdMetric,
-                             current_predictor: Predictor,
-                             timestamp: datetime.datetime,
-                             measurements: np.array,
-                             prediction: np.array) -> Optional[Predictor]:
-        """
-        Iterates over the available PredictionModels, compares their performance on the latest measurements and returns
-        a Predictor with the best model.
-
-        :param threshold_metric: the threshold metric used to rank the models
-        :param current_predictor: the Predictor currently used by the Sensor
-        :param timestamp: the timestamp when the latest measurements were taken
-        :param measurements: the latest measurements
-        :param prediction: the latest prediction
-
-        :return: a Predictor with the best possible PredictionModel according to the threshold_metric, or None if none
-        of the models has better performances than the current one.
-        """
-        best_predictor = self._get_better_predictor(
-            threshold_metric, current_predictor, timestamp, measurements, prediction
-        )
-        return best_predictor
-
     def _load_local_models(self) -> None:
         """
         Initializes the Sensor's models portfolio by loading all TFLite models in its storage.
@@ -138,42 +115,3 @@ class ModelManager:
             if item.is_dir():
                 model = load_model_tflite(item.path)
                 self._models[model.metadata.model_id] = model
-
-    def _get_better_predictor(self,
-                              threshold_metric: ThresholdMetric,
-                              current_predictor: Predictor,
-                              timestamp: datetime.datetime,
-                              measurements: np.array,
-                              prediction: np.array) -> Optional[Predictor]:
-        """
-        Iterates over the provided PredictionModels, comparing their performance on the latest measurements and returning
-        a Predictor with the best model.
-
-        :param threshold_metric: the threshold metric used to rank the models
-        :param current_predictor: the Predictor currently used by the Sensor
-        :param timestamp: the timestamp when the latest measurements were taken
-        :param measurements: the latest measurements
-        :param prediction: the latest prediction
-
-        :return: a Predictor with the best possible PredictionModel according to the threshold_metric, or None if none
-        of the models has better performances than the current one.
-        """
-        best_score = threshold_metric.threshold_score(measurements, prediction)
-        best_predictor = None
-        for model in list(self._models.values()):
-            model_id = model.metadata.model_id
-            if model_id == current_predictor.model_id:
-                continue
-            predictor = Predictor(model, current_predictor.prediction_period, current_predictor.data)
-            predictor.update_prediction_horizon(timestamp)
-            prediction = predictor.get_prediction_at(timestamp).to_numpy()
-            if threshold_metric.is_threshold_violation(measurements, prediction):
-                logging.debug(f"Model candidate {model_id} would have violated the threshold, skipping")
-                continue
-            score = threshold_metric.threshold_score(measurements, prediction)
-            logging.debug(f"Model candidate {model_id} score: {score} | score to beat: {best_score}")
-            if score < best_score:
-                logging.debug(f"New best model: {predictor.model_id}")
-                best_score = score
-                best_predictor = predictor
-        return best_predictor

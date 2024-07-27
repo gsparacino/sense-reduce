@@ -15,12 +15,13 @@ class Profiler:
 
     def __new__(cls, *args, **kwargs):
         if cls.instance is None:
-            logging.debug("Creating new instance of EventLogger")
+            logging.debug("Creating new instance of Profiler")
             cls.instance = super().__new__(cls)
         return cls.instance
 
-    def __init__(self, log_path: os.path):
-        self._log_path = log_path
+    def __init__(self, log_dir: os.path):
+        path = os.path.join(log_dir, 'profiling.csv')
+        self._log_path = path
         self._init_log_file()
 
     def _init_log_file(self):
@@ -117,12 +118,12 @@ class Profiler:
 _profiler: Optional[Profiler] = None
 
 
-def init_profiler(log_path: os.path):
+def init_profiler(log_dir: os.path) -> None:
     global _profiler
-    _profiler = Profiler(log_path)
+    _profiler = Profiler(log_dir)
 
 
-def get_profiler() -> Profiler:
+def get_profiler() -> Optional[Profiler]:
     global _profiler
     if _profiler is not None:
         return _profiler

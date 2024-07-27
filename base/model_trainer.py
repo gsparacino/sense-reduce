@@ -5,21 +5,21 @@ from typing import Dict, Optional, Union
 import keras
 import pandas as pd
 import tensorflow as tf
-from base.training import mse_weighted
 
 from base.model import ModelID, Model
+from base.training import mse_weighted
 from base.window_generator import WindowGenerator
 from common import ModelMetadata, normalize_df, split_df, convert_datetime
 
 
-class ModelTrainer(ABC):
+class LearningStrategy(ABC):
 
     @abstractmethod
     def train_new_model(self, old_model: keras.Model, metadata: ModelMetadata, data: pd.DataFrame) -> Model:
         pass
 
 
-class DefaultModelTrainer(ModelTrainer):
+class RetrainLearningStrategy(LearningStrategy):
 
     def __init__(self,
                  epochs: int = 100,

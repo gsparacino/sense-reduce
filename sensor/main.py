@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.DEBUG)
 profile_log_path = os.getenv('PROFILE_LOG_PATH')
 
 if profile_log_path is not None:
-    init_profiler(os.path.join(BASEDIR, profile_log_path))
+    init_profiler(profile_log_path)
 
 
 def run(threshold_metric: ThresholdMetric,

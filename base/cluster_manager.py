@@ -8,7 +8,7 @@ from base import Config
 from base.base_adaptive_strategy import BaseStationAdaptiveStrategy
 from base.model import Model, ModelID
 from base.model_manager import ModelManager
-from base.model_trainer import ModelTrainer
+from base.model_trainer import LearningStrategy
 from base.node_manager import NodeManager, NodeID
 from common import ThresholdMetric, ModelMetadata
 
@@ -18,7 +18,7 @@ class ClusterManager:
     def __init__(self,
                  config: Config,
                  model_manager: ModelManager,
-                 model_trainer: ModelTrainer,
+                 model_trainer: LearningStrategy,
                  adaptive_strategy: BaseStationAdaptiveStrategy
                  ):
         self._nodes: dict[NodeID, NodeManager] = {}

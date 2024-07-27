@@ -8,7 +8,7 @@ import pandas as pd
 from base import Config
 from base.model import ModelID, Model
 from base.model_manager import ModelManager
-from base.model_trainer import ModelTrainer
+from base.model_trainer import LearningStrategy
 from base.node_manager import NodeManager, NodeID
 from common import ModelMetadata
 from common.resource_profiler import profiled
@@ -41,7 +41,7 @@ class BaseStationAdaptiveStrategy(ABC):
 
 class DefaultBaseStationAdaptiveStrategy(BaseStationAdaptiveStrategy):
 
-    def __init__(self, config: Config, model_manager: ModelManager, model_trainer: ModelTrainer):
+    def __init__(self, config: Config, model_manager: ModelManager, model_trainer: LearningStrategy):
         self._config = config
         self._model_manager = model_manager
         self._model_trainer = model_trainer

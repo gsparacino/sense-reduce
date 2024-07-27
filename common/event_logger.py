@@ -8,12 +8,10 @@ from pathlib import Path
 
 class LogEventType(Enum):
     REGISTRATION = auto(),
-    MODEL_SEND = auto(),
-    MODEL_SWITCH = auto(),
     VIOLATION = auto(),
-    PORTFOLIO_SYNC = auto(),
+    SYNC = auto(),
     MEASUREMENT = auto(),
-    NEW_MODEL_REQUEST = auto()
+    MODEL_DEPLOYMENT = auto()
 
 
 class LogEvent(object):

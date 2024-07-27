@@ -9,6 +9,7 @@ keras_tuner==1.1.*
 
 Flask
 requests
+yaml
 
 matplotlib==3.6.*
 seaborn==0.12.*

@@ -7,6 +7,7 @@ import pandas as pd
 
 from .data_storage import DataStorage
 from .prediction_model import PredictionModel
+from .resource_profiler import profiled
 
 
 class PredictionHorizon:
@@ -173,14 +174,15 @@ class Predictor:
         self._prediction_horizon = PredictionHorizon(self._prediction_horizon.df + diff)
         logging.debug(f'New prediction horizon: \n {self._prediction_horizon}')
 
+    @profiled(tag="Prediction")
     def update_prediction_horizon(self, start: datetime):
         """Updates the interpolation points used for computing predictions. """
-        if self._prediction_horizon is not None and \
-                self._prediction_horizon.df.index[0] <= start < self._prediction_horizon.df.index[1]:
-            logging.debug(f'Skipped updating prediction horizon because nothing would change: '
-                          f'{self._prediction_horizon.df.index[0]} <= {start} < {self._prediction_horizon.df.index[1]}'
-                          )
-            return
+        # if self._prediction_horizon is not None and \
+        #         self._prediction_horizon.df.index[0] <= start < self._prediction_horizon.df.index[1]:
+        #     logging.debug(f'Skipped updating prediction horizon because nothing would change: '
+        #                   f'{self._prediction_horizon.df.index[0]} <= {start} < {self._prediction_horizon.df.index[1]}'
+        #                   )
+        #     return
 
         previous_m = self._data.get_previous_measurements(start,
                                                           self._model.metadata.input_length,

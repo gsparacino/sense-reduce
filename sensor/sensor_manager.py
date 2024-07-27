@@ -6,7 +6,6 @@ from typing import Optional
 import pandas as pd
 
 from common import Predictor, DataStorage
-from common.resource_profiler import profiled
 from sensor.abstract_sensor import AbstractSensor
 from sensor.base_station_gateway import BaseStationGateway, NodeInitialization
 from sensor.model_manager import ModelManager
@@ -84,6 +83,8 @@ class SensorManager:
                     predictor.log_violation(timestamp)
                     violation = Violation(node_id, timestamp, predictor, measurements_array, prediction_array)
                     self.predictor = self.adaptive_strategy.handle_violation(violation)
+            else:
+                self.base_station.send_measurement(node_id, timestamp, measurement)
 
             time.sleep(time_interval)
 
@@ -92,7 +93,6 @@ class SensorManager:
     def _can_make_predictions(self):
         return len(self._data_storage.get_measurements()) >= self._initial_model.input_length
 
-    @profiled(tag="Update Prediction Horizon")
     def _update_horizon(self, timestamp):
         measurements = self.predictor.get_reduced_measurements_in_current_prediction_horizon(timestamp)
         self.base_station.synchronize(self.node_id, timestamp, self.predictor.model_id, measurements)

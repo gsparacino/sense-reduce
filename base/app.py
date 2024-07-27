@@ -1,37 +1,36 @@
 import datetime
+import json
 import logging
 import os
 import time
 
 import pandas as pd
-from flask import request, send_file, Flask, g
+from flask import request, send_file, g, Flask
 
 from base import config
 from base.base_adaptive_strategy import DefaultBaseStationAdaptiveStrategy
 from base.cluster_manager import ClusterManager
 from base.model_manager import ModelManager
-from base.model_trainer import DefaultModelTrainer
-from common import ThresholdMetric
-from common.resource_profiler import init_profiler, get_profiler
+from base.model_trainer import RetrainLearningStrategy
+from common import ThresholdMetric, LogEvent, LogEventType
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
 model_manager = ModelManager(config)
-model_trainer = DefaultModelTrainer(epochs=2)
+# TODO: make number of epochs configurable
+model_trainer = RetrainLearningStrategy(epochs=10)
 adaptive_strategy = DefaultBaseStationAdaptiveStrategy(config, model_manager, model_trainer)
 cluster_manager = ClusterManager(config, model_manager, model_trainer, adaptive_strategy)
+
+profiler = config.profiler
+event_logger = config.event_logger
 
 # Create a Flask application
 app = Flask('base', static_folder=config.model_dir)
 
-# Init Profiler
-if config.profiling_log_path is not None:
-    init_profiler(os.path.join(BASEDIR, config.profiling_log_path))
-
 
 @app.before_request
 def before_request():
-    profiler = get_profiler()
     if profiler is not None:
         if request.data:
             request_size = len(request.data)
@@ -44,7 +43,6 @@ def before_request():
 
 @app.after_request
 def after_request(response):
-    profiler = get_profiler()
     if profiler is not None:
         response_size = int(response.headers.get('Content-Length'))
 
@@ -64,10 +62,14 @@ def after_request(response):
 
 @app.post("/nodes/<string:node_id>/measurement")
 def add_measurement(node_id: str):
-    logging.info(f'Node {node_id} sent new measurements')
+    logging.info(f'Node {node_id} sent new measurement: {request.data}')
+    event_logger.log_event(LogEvent(node_id, LogEventType.MEASUREMENT))
     body = request.get_json(force=True)
-    measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
-    cluster_manager.add_measurements(node_id, measurements)
+    data = json.loads(body.get('measurement'))
+    timestamp = datetime.datetime.strptime(body.get('timestamp'), '%Y-%m-%dT%H:%M:%S.%f')
+    new_measurement = pd.DataFrame(data=[data], index=[pd.to_datetime(timestamp)])
+    cluster_manager.add_measurements(node_id, new_measurement)
+    return '', 200
 
 
 @app.post("/nodes")
@@ -75,6 +77,7 @@ def register_node():
     """Registers a new node and returns the model metadata and initial data for the node."""
     body: dict = request.get_json(force=True)
     node_id = body["node_id"]
+    event_logger.log_event(LogEvent(node_id, LogEventType.REGISTRATION))
     threshold_metric = ThresholdMetric.from_dict(body['threshold_metric'])
 
     logging.info(f'Node registration request: {node_id}')
@@ -94,6 +97,7 @@ def register_node():
 def post_violation(node_id: str):
     logging.info(f'Node {node_id} sent a violation notification')
     body = request.get_json(force=True)
+    event_logger.log_event(LogEvent(node_id, LogEventType.VIOLATION))
     cluster_manager.add_violation(node_id, body['timestamp'], body['model'])
     if body.get('measurements') is not None:
         measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
@@ -112,6 +116,7 @@ def post_violation(node_id: str):
 @app.get("/nodes/<string:node_id>/models/<string:model_id>")
 def get_model(node_id: str, model_id: str):
     logging.info(f'Node {node_id} requested model {model_id}')
+    event_logger.log_event(LogEvent(node_id, LogEventType.MODEL_DEPLOYMENT, model_id))
     model_file_path = cluster_manager.get_model_upload_path(model_id)
     return send_file(model_file_path)
 
@@ -126,6 +131,7 @@ def get_model_metadata(node_id: str, model_id: str):
 @app.post("/nodes/<string:node_id>/sync")
 def sync(node_id: str):
     logging.info(f'Node {node_id} sent synchronization request')
+    event_logger.log_event(LogEvent(node_id, LogEventType.SYNC))
     body = request.get_json(force=True)
     if body.get('measurements') is not None:
         measurements: pd.DataFrame = pd.read_json(body.get('measurements'))

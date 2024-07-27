@@ -2,6 +2,7 @@ import logging
 import os
 
 from common import EventLogger
+from common.resource_profiler import init_profiler, get_profiler
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -10,7 +11,7 @@ class Config(object):
 
     def __init__(self,
                  model_dir: str, log_dir: str, data_dir: str, base_model_id: str,
-                 training_data_pickle: str, log_level: str, profiling_log_path: str):
+                 training_data_pickle: str, log_level: str):
         logging.basicConfig(level=logging.getLevelName(log_level))
         logging.info(f'Initializing configuration: '
                      f'model_dir = {model_dir}, '
@@ -25,4 +26,5 @@ class Config(object):
         self.data_dir = os.path.join(BASEDIR, data_dir)
         self.base_model_id = base_model_id
         self.training_data_pickle_path = os.path.join(BASEDIR, data_dir, training_data_pickle)
-        self.profiling_log_path = profiling_log_path
+        init_profiler(log_dir)
+        self.profiler = get_profiler()

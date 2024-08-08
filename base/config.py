@@ -11,7 +11,7 @@ class Config(object):
 
     def __init__(self,
                  model_dir: str, log_dir: str, data_dir: str, base_model_id: str,
-                 training_data_pickle: str, log_level: str):
+                 log_level: str, learning_strategy: str, adaptive_strategy: str, training_data_pickle: str = None):
         logging.basicConfig(level=logging.getLevelName(log_level))
         logging.info(f'Initializing configuration: '
                      f'model_dir = {model_dir}, '
@@ -25,6 +25,8 @@ class Config(object):
         self.model_dir = os.path.join(BASEDIR, model_dir)
         self.data_dir = os.path.join(BASEDIR, data_dir)
         self.base_model_id = base_model_id
-        self.training_data_pickle_path = os.path.join(BASEDIR, data_dir, training_data_pickle)
+        self.learning_strategy = learning_strategy
+        self.adaptive_strategy = adaptive_strategy
+        self.training_data_pickle_path = os.path.join(BASEDIR, data_dir, training_data_pickle) if training_data_pickle else None
         init_profiler(log_dir)
         self.profiler = get_profiler()

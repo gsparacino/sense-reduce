@@ -8,7 +8,7 @@ from base import Config
 from base.base_adaptive_strategy import BaseStationAdaptiveStrategy
 from base.model import Model, ModelID
 from base.model_manager import ModelManager
-from base.model_trainer import LearningStrategy
+from base.learning_strategy import LearningStrategy
 from base.node_manager import NodeManager, NodeID
 from common import ThresholdMetric, ModelMetadata
 
@@ -18,13 +18,14 @@ class ClusterManager:
     def __init__(self,
                  config: Config,
                  model_manager: ModelManager,
-                 model_trainer: LearningStrategy,
+                 learning_strategy: LearningStrategy,
                  adaptive_strategy: BaseStationAdaptiveStrategy
                  ):
         self._nodes: dict[NodeID, NodeManager] = {}
         self._model_manager = model_manager
-        self._model_trainer = model_trainer
-        self._training_df: pd.DataFrame = pd.read_pickle(config.training_data_pickle_path)
+        self._learning_strategy = learning_strategy
+        self._training_df: pd.DataFrame = (
+            pd.read_pickle(config.training_data_pickle_path)) if config.training_data_pickle_path else None
         # TODO: extension idea -> ClusterManager can change strategy at runtime, depending on the context
         self._adaptive_strategy = adaptive_strategy
 
@@ -38,7 +39,7 @@ class ClusterManager:
         """
         model = self._model_manager.base_model
         node_manager = NodeManager(node_id, threshold_metric, model)
-        if data is None:
+        if data is None and self._training_df is not None:
             node_manager.add_measurements(self._training_df)
         else:
             node_manager.add_measurements(data)

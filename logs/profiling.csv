@@ -1,5 +1,116 @@
 timestamp,func,details,elapsed_time_ms,cpu_time_ms,peak_memory_usage_MB,received_data_B,transmitted_data_B
-2024-07-21 21:02:29.158067,ping,GET /ping ,0.0,0,0.0,0,4
-2024-07-21 21:02:31.881484,register_node,POST /nodes ,15.63,0,0.0,147,940
-2024-07-21 21:02:55.656338,get_model_metadata,GET /nodes/S1/models/zamg_vienna_2019_2019_simple_dense/metadata ,0.0,0,0.0,0,870
-2024-07-21 21:03:05.546938,get_model,GET /nodes/S1/models/zamg_vienna_2019_2019_simple_dense ,30.81,0,0.0,0,7716
+2024-08-08 13:45:16.523993,ping,GET /ping ,0.0,0,0.0,0,4
+2024-08-08 13:45:16.593464,register_node,POST /nodes ,1604.61,0,0.0,147,19460624
+2024-08-08 13:45:19.592163,update_prediction_horizon,Prediction,954.36,437.5,5.23,0,0
+2024-08-08 13:46:00.956361,post_violation,POST /nodes/S1/violation ,358.86,0,0.0,775,371
+2024-08-08 13:46:01.321232,update_prediction_horizon,Prediction,577.59,328.12,5.23,0,0
+2024-08-08 13:46:14.051231,post_violation,POST /nodes/S1/violation ,55.78,0,0.0,679,371
+2024-08-08 13:46:14.118015,update_prediction_horizon,Prediction,2209.08,1078.12,5.23,0,0
+2024-08-08 13:46:20.553505,post_violation,POST /nodes/S1/violation ,138.45,0,0.0,680,371
+2024-08-08 13:46:20.717793,update_prediction_horizon,Prediction,3147.03,2281.25,5.24,0,0
+2024-08-08 13:46:23.974379,update_prediction_horizon,Prediction,4878.01,2578.12,5.24,0,0
+2024-08-08 13:46:29.048471,update_prediction_horizon,Prediction,3545.99,1968.75,5.24,0,0
+2024-08-08 13:46:32.691079,update_prediction_horizon,Prediction,2020.9,890.62,5.24,0,0
+2024-08-08 13:46:34.763971,update_prediction_horizon,Prediction,1778.5,765.62,5.24,0,0
+2024-08-08 13:46:36.617205,update_prediction_horizon,Prediction,1786.75,593.75,5.24,0,0
+2024-08-08 13:46:38.466114,update_prediction_horizon,Prediction,3243.44,1750.0,5.24,0,0
+2024-08-08 13:46:41.811759,update_prediction_horizon,Prediction,2479.69,1828.12,5.24,0,0
+2024-08-08 13:46:44.365965,update_prediction_horizon,Prediction,2373.1,1312.5,5.24,0,0
+2024-08-08 13:46:20.710855,_find_better_predictor,New model selection,26100.67,14359.38,0.0,0,0
+2024-08-08 13:46:46.819090,update_prediction_horizon,Prediction,1737.38,812.5,5.23,0,0
+2024-08-08 13:46:50.616876,post_violation,POST /nodes/S1/violation ,69.74,0,0.0,670,371
+2024-08-08 13:46:50.695923,update_prediction_horizon,Prediction,1290.85,562.5,5.23,0,0
+2024-08-08 13:47:00.205072,post_violation,POST /nodes/S1/violation ,68.69,0,0.0,670,371
+2024-08-08 13:47:00.283986,update_prediction_horizon,Prediction,1208.67,625.0,5.23,0,0
+2024-08-08 13:47:15.890873,post_violation,POST /nodes/S1/violation ,93.04,0,0.0,662,371
+2024-08-08 13:47:15.997692,update_prediction_horizon,Prediction,1475.09,640.62,5.24,0,0
+2024-08-08 13:47:17.558878,update_prediction_horizon,Prediction,2025.1,843.75,5.24,0,0
+2024-08-08 13:47:19.707904,update_prediction_horizon,Prediction,1901.14,546.88,5.24,0,0
+2024-08-08 13:47:21.681810,update_prediction_horizon,Prediction,1530.62,750.0,5.24,0,0
+2024-08-08 13:47:23.277540,update_prediction_horizon,Prediction,1530.97,406.25,5.24,0,0
+2024-08-08 13:47:24.902814,update_prediction_horizon,Prediction,2822.5,1484.38,5.24,0,0
+2024-08-08 13:47:27.830376,update_prediction_horizon,Prediction,1744.04,453.12,5.24,0,0
+2024-08-08 13:47:29.684662,update_prediction_horizon,Prediction,1874.11,562.5,5.24,0,0
+2024-08-08 13:47:31.681130,update_prediction_horizon,Prediction,1752.7,875.0,5.24,0,0
+2024-08-08 13:47:15.994786,_find_better_predictor,New model selection,17502.71,6843.75,0.0,0,0
+2024-08-08 13:47:33.507014,update_prediction_horizon,Prediction,1546.21,843.75,5.23,0,0
+2024-08-08 13:47:45.522443,post_violation,POST /nodes/S1/violation ,95.54,0,0.0,679,371
+2024-08-08 13:47:45.633431,update_prediction_horizon,Prediction,2090.68,1265.62,5.23,0,0
+2024-08-08 13:48:04.385955,post_violation,POST /nodes/S1/violation ,110.38,0,0.0,763,371
+2024-08-08 13:48:04.518295,update_prediction_horizon,Prediction,1802.98,859.38,5.23,0,0
+2024-08-08 13:48:14.736805,post_violation,POST /nodes/S1/violation ,157.74,0,0.0,643,371
+2024-08-08 13:48:14.911165,update_prediction_horizon,Prediction,2903.33,1859.38,5.24,0,0
+2024-08-08 13:48:17.929395,update_prediction_horizon,Prediction,2970.48,2250.0,5.24,0,0
+2024-08-08 13:48:21.096512,update_prediction_horizon,Prediction,2740.96,1796.88,5.24,0,0
+2024-08-08 13:48:23.942681,update_prediction_horizon,Prediction,2618.33,1562.5,5.24,0,0
+2024-08-08 13:48:26.719356,update_prediction_horizon,Prediction,2595.55,1265.62,5.24,0,0
+2024-08-08 13:48:29.407102,update_prediction_horizon,Prediction,1793.18,781.25,5.24,0,0
+2024-08-08 13:48:31.272229,update_prediction_horizon,Prediction,1627.91,656.25,5.24,0,0
+2024-08-08 13:48:32.982405,update_prediction_horizon,Prediction,1712.7,687.5,5.24,0,0
+2024-08-08 13:48:34.769986,update_prediction_horizon,Prediction,1499.23,781.25,5.24,0,0
+2024-08-08 13:48:14.907831,_find_better_predictor,New model selection,21441.42,12156.25,0.0,0,0
+2024-08-08 13:48:36.365466,update_prediction_horizon,Prediction,1460.95,687.5,5.23,0,0
+2024-08-08 13:48:39.888098,post_violation,POST /nodes/S1/violation ,74.75,0,0.0,651,371
+2024-08-08 13:48:40.017200,update_prediction_horizon,Prediction,3981.47,2156.25,5.23,0,0
+2024-08-08 13:48:50.186765,post_violation,POST /nodes/S1/violation ,96.18,0,0.0,656,371
+2024-08-08 13:48:50.296965,update_prediction_horizon,Prediction,1975.13,656.25,5.23,0,0
+2024-08-08 13:49:32.678796,post_violation,POST /nodes/S1/violation ,42.95,0,0.0,671,371
+2024-08-08 13:49:32.734784,update_prediction_horizon,Prediction,892.44,281.25,5.25,0,0
+2024-08-08 13:49:33.725199,update_prediction_horizon,Prediction,1063.5,546.88,5.24,0,0
+2024-08-08 13:49:34.865584,update_prediction_horizon,Prediction,824.65,562.5,5.24,0,0
+2024-08-08 13:49:35.761776,update_prediction_horizon,Prediction,791.49,531.25,5.24,0,0
+2024-08-08 13:49:36.632398,update_prediction_horizon,Prediction,856.56,281.25,5.24,0,0
+2024-08-08 13:49:37.576202,update_prediction_horizon,Prediction,800.03,546.88,5.24,0,0
+2024-08-08 13:49:38.440672,update_prediction_horizon,Prediction,804.06,562.5,5.24,0,0
+2024-08-08 13:49:39.318911,update_prediction_horizon,Prediction,752.44,578.12,5.24,0,0
+2024-08-08 13:49:40.152807,update_prediction_horizon,Prediction,781.49,453.12,5.24,0,0
+2024-08-08 13:49:32.733786,_find_better_predictor,New model selection,8276.19,4656.25,0.0,0,0
+2024-08-08 13:49:41.015893,update_prediction_horizon,Prediction,819.29,484.38,5.23,0,0
+2024-08-08 13:49:43.864828,post_violation,POST /nodes/S1/violation ,34.11,0,0.0,671,371
+2024-08-08 13:49:43.908843,update_prediction_horizon,Prediction,643.1,359.38,5.23,0,0
+2024-08-08 13:49:58.672025,post_violation,POST /nodes/S1/violation ,31.01,0,0.0,670,371
+2024-08-08 13:49:58.708939,update_prediction_horizon,Prediction,499.25,390.62,5.23,0,0
+2024-08-08 13:50:09.309423,post_violation,POST /nodes/S1/violation ,41.24,0,0.0,789,371
+2024-08-08 13:50:09.360753,update_prediction_horizon,Prediction,657.65,500.0,5.24,0,0
+2024-08-08 13:50:10.049660,update_prediction_horizon,Prediction,674.18,531.25,5.24,0,0
+2024-08-08 13:50:10.762089,update_prediction_horizon,Prediction,660.51,578.12,5.24,0,0
+2024-08-08 13:50:11.458815,update_prediction_horizon,Prediction,645.81,625.0,5.24,0,0
+2024-08-08 13:50:12.140360,update_prediction_horizon,Prediction,692.74,531.25,5.24,0,0
+2024-08-08 13:50:12.870343,update_prediction_horizon,Prediction,708.35,562.5,5.24,0,0
+2024-08-08 13:50:13.619671,update_prediction_horizon,Prediction,744.71,593.75,5.24,0,0
+2024-08-08 13:50:14.408590,update_prediction_horizon,Prediction,829.73,390.62,5.24,0,0
+2024-08-08 13:50:15.279005,update_prediction_horizon,Prediction,855.36,671.88,5.24,0,0
+2024-08-08 13:50:09.358751,_find_better_predictor,New model selection,6821.72,5078.12,0.0,0,0
+2024-08-08 13:50:18.211346,post_violation,POST /nodes/S1/violation ,41.78,0,0.0,789,371
+2024-08-08 13:50:18.260117,update_prediction_horizon,Prediction,715.53,343.75,5.25,0,0
+2024-08-08 13:50:19.019862,update_prediction_horizon,Prediction,765.1,625.0,5.24,0,0
+2024-08-08 13:50:19.826789,update_prediction_horizon,Prediction,807.54,750.0,5.24,0,0
+2024-08-08 13:50:20.686939,update_prediction_horizon,Prediction,907.68,562.5,5.24,0,0
+2024-08-08 13:50:21.656639,update_prediction_horizon,Prediction,1098.58,406.25,5.24,0,0
+2024-08-08 13:50:22.813018,update_prediction_horizon,Prediction,1084.53,546.88,5.24,0,0
+2024-08-08 13:50:23.958063,update_prediction_horizon,Prediction,961.85,671.88,5.24,0,0
+2024-08-08 13:50:24.967642,update_prediction_horizon,Prediction,807.15,609.38,5.24,0,0
+2024-08-08 13:50:25.823117,update_prediction_horizon,Prediction,829.26,546.88,5.24,0,0
+2024-08-08 13:50:18.260117,_find_better_predictor,New model selection,8438.76,5171.88,0.0,0,0
+2024-08-08 13:50:28.729255,post_violation,POST /nodes/S1/violation ,40.08,0,0.0,799,371
+2024-08-08 13:50:28.778339,update_prediction_horizon,Prediction,685.53,578.12,5.25,0,0
+2024-08-08 13:50:29.508359,update_prediction_horizon,Prediction,767.55,515.62,5.24,0,0
+2024-08-08 13:50:30.328511,update_prediction_horizon,Prediction,797.35,593.75,5.24,0,0
+2024-08-08 13:50:31.172676,update_prediction_horizon,Prediction,1049.23,656.25,5.24,0,0
+2024-08-08 13:50:32.286862,update_prediction_horizon,Prediction,1169.78,515.62,5.24,0,0
+2024-08-08 13:50:33.513888,update_prediction_horizon,Prediction,912.17,750.0,5.24,0,0
+2024-08-08 13:50:34.480282,update_prediction_horizon,Prediction,995.66,531.25,5.24,0,0
+2024-08-08 13:50:35.543603,update_prediction_horizon,Prediction,1143.81,828.12,5.24,0,0
+2024-08-08 13:50:36.747265,update_prediction_horizon,Prediction,908.79,703.12,5.24,0,0
+2024-08-08 13:50:28.777337,_find_better_predictor,New model selection,8926.67,5828.12,0.0,0,0
+2024-08-08 13:50:39.734007,post_violation,POST /nodes/S1/violation ,34.04,0,0.0,790,371
+2024-08-08 13:50:39.777046,update_prediction_horizon,Prediction,575.22,359.38,5.24,0,0
+2024-08-08 13:50:40.395406,update_prediction_horizon,Prediction,687.12,484.38,5.24,0,0
+2024-08-08 13:50:41.138577,update_prediction_horizon,Prediction,1032.62,843.75,5.24,0,0
+2024-08-08 13:50:42.224814,update_prediction_horizon,Prediction,1007.97,750.0,5.24,0,0
+2024-08-08 13:50:43.293140,update_prediction_horizon,Prediction,750.98,515.62,5.24,0,0
+2024-08-08 13:50:44.093245,update_prediction_horizon,Prediction,709.16,531.25,5.24,0,0
+2024-08-08 13:50:44.845744,update_prediction_horizon,Prediction,697.79,406.25,5.24,0,0
+2024-08-08 13:50:45.585173,update_prediction_horizon,Prediction,650.48,531.25,5.24,0,0
+2024-08-08 13:50:46.278366,update_prediction_horizon,Prediction,678.6,453.12,5.24,0,0
+2024-08-08 13:50:39.776126,_find_better_predictor,New model selection,7221.12,5093.75,0.0,0,0

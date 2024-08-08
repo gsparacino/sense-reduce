@@ -1,0 +1,8 @@
+log_level: DEBUG
+model_dir: models
+log_dir: logs
+data_dir: data
+base_model_id: zamg_vienna_2019_2019_simple_dense
+training_data_pickle: vienna_20190101_20191231.pickle
+learning_strategy: noupdate
+adaptive_strategy: fixed

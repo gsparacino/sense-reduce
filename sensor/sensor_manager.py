@@ -44,8 +44,7 @@ class SensorManager:
         self.adaptive_strategy = adaptive_strategy
         self.node_initialization: NodeInitialization = node_initialization
         self._initial_model = node_initialization.current_model
-        self._data_storage: DataStorage = DataStorage(self._initial_model.input_features,
-                                                      self._initial_model.output_features)
+        self._data_storage: DataStorage = self._init_data_storage(node_initialization)
         self.prediction_interval: float = prediction_interval
         self.predictor: Optional[Predictor] = None
 
@@ -62,29 +61,35 @@ class SensorManager:
             measurement, timestamp = self._get_measurement()
             logging.debug(f"Measurement @ {timestamp}: {measurement.values}")
 
-            measurements_array = measurement.to_numpy()
-            self._data_storage.add_measurement(timestamp, measurements_array)
+            self.adaptive_strategy.execute(measurement, timestamp)
 
-            if self._can_make_predictions():
-                if self.predictor is None:
-                    self.predictor = self._init_predictor(self.prediction_interval,
-                                                          self.node_initialization,
-                                                          self._data_storage)
-                predictor = self.predictor
-                if not predictor.in_prediction_horizon(timestamp):
-                    self._update_horizon(timestamp)
-                prediction = self._get_prediction(timestamp)
-                logging.debug(f"Prediction by {predictor.model_id} @ {timestamp}: {prediction.values}")
-
-                prediction_array = prediction.to_numpy()
-                predictor.log_prediction(timestamp, prediction_array)
-
-                if self.adaptive_strategy.is_violation(measurements_array, prediction_array):
-                    predictor.log_violation(timestamp)
-                    violation = Violation(node_id, timestamp, predictor, measurements_array, prediction_array)
-                    self.predictor = self.adaptive_strategy.handle_violation(violation)
-            else:
-                self.base_station.send_measurement(node_id, timestamp, measurement)
+            # measurements_array = measurement.to_numpy()
+            # self._data_storage.add_measurement(timestamp, measurements_array)
+            #
+            # if self._can_make_predictions():
+            #     # if self.predictor is None:
+            #     # self.predictor = self._init_predictor(self.prediction_interval,
+            #     #                                       self.node_initialization,
+            #     #                                       self._data_storage)
+            #     if self.predictor is None:
+            #         violation = Violation(node_id, timestamp, None, measurements_array, prediction_array)
+            #         self.predictor = self.adaptive_strategy.handle_violation(violation)
+            #
+            #     predictor = self.predictor
+            #     if not predictor.in_prediction_horizon(timestamp):
+            #         self._refresh_expired_horizon(timestamp)
+            #     prediction = predictor.get_prediction_at(timestamp)
+            #     logging.debug(f"Prediction by {predictor.model_id} @ {timestamp}: {prediction.values}")
+            #
+            #     prediction_array = prediction.to_numpy()
+            #     predictor.log_prediction(timestamp, prediction_array)
+            #
+            #     if self.adaptive_strategy.is_violation(measurements_array, prediction_array):
+            #         violation = Violation(node_id, timestamp, predictor, measurements_array, prediction_array)
+            #         self.predictor.add_violation(timestamp)
+            #         self.predictor = self.adaptive_strategy.handle_violation(violation)
+            # else:
+            #     self.base_station.send_measurement(node_id, timestamp, measurement)
 
             time.sleep(time_interval)
 
@@ -93,10 +98,12 @@ class SensorManager:
     def _can_make_predictions(self):
         return len(self._data_storage.get_measurements()) >= self._initial_model.input_length
 
-    def _update_horizon(self, timestamp):
+    def _refresh_expired_horizon(self, timestamp):
         measurements = self.predictor.get_reduced_measurements_in_current_prediction_horizon(timestamp)
         self.base_station.synchronize(self.node_id, timestamp, self.predictor.model_id, measurements)
+        self.predictor.add_prediction_horizon_update(timestamp)
         self.predictor.update_prediction_horizon(timestamp)
+        logging.debug(f"Updated Prediction Horizon (scheduled update): \n {self.predictor.get_prediction_horizon()}")
 
     def _get_prediction(self, timestamp: datetime.datetime):
         predictor = self.predictor
@@ -121,3 +128,11 @@ class SensorManager:
         predictor = Predictor(current_model, period, data_storage)
         predictor.update_prediction_horizon(datetime.datetime.now())
         return predictor
+
+    def _init_data_storage(self, node_initialization: NodeInitialization) -> DataStorage:
+        initial_df = node_initialization.initial_df
+        if initial_df is None:
+            return DataStorage(self._initial_model.input_features,
+                               self._initial_model.output_features)
+        else:
+            return initial_df

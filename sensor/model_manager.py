@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Optional
 
@@ -22,7 +23,6 @@ class ModelManager:
         self._base_station = base_station_gateway
         self._model_dir = os.path.join(ModelManager.base_dir, model_dir)
         self._models: dict[str, PredictionModel] = {}
-        self._model_rankings: dict[str, int] = {}
         self._load_local_models()
 
     def _save_model(self, model_bytes: bytes, metadata: ModelMetadata) -> PredictionModel:
@@ -86,15 +86,31 @@ class ModelManager:
         :param model_ids: The list of model IDs that are available for the node
         """
         current_models = set(model_id for model_id in self._models.keys())
+        logging.debug(f"Portfolio update - current models: {self._model_list(current_models)}")
         expected_models = set(model_ids)
+        logging.debug(f"Portfolio update - BS models: {self._model_list(expected_models)}")
 
         models_to_remove = current_models.difference(expected_models)
+        logging.debug(f"Portfolio update - models to remove: {self._model_list(models_to_remove)}")
         for model_id in models_to_remove:
             self._delete_model(model_id)
         models_to_add = expected_models.difference(current_models)
+        logging.debug(f"Portfolio update - models to add: {self._model_list(models_to_add)}")
         for model_id in models_to_add:
             model_metadata = self._base_station.get_model_metadata(node_id=self.node_id, model_id=model_id)
             self.add_model(model_metadata)
+
+    @staticmethod
+    def _model_list(models: set[str]) -> str:
+        result = "["
+        f_comma = False
+        for model in models:
+            if f_comma:
+                result += ", "
+            else:
+                f_comma = True
+            result += model
+        return result + "]"
 
     def _delete_model(self, model_name: str) -> None:
         """

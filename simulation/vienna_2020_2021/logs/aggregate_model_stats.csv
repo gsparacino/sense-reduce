@@ -1,0 +1,2 @@
+measurements,horizon_updates,uptime_sec,simulated_uptime_sec,model_switches,violations,violations_per_sim_hour,model_switches_per_sim_hour,violations_per_measurement
+5335.0,2.0,10799.92629,3201000.0,16.0,233.0,0.2620431115276476,0.017994376757263356,0.043673851921274605

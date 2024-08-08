@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import shutil
 from typing import Any
@@ -17,6 +18,7 @@ def load_model_from_savemodel(path: os.path) -> Model:
     :param path: the path to the directory containing the model in SaveModel format
     :return: the loaded model
     """
+    logging.debug(f"Loading model from {path}")
     metadata = _load_model_metadata(path)
     keras_model = tf.keras.models.load_model(path)
     return Model(keras_model, metadata)
@@ -40,6 +42,7 @@ def _load_model_metadata(path: str) -> ModelMetadata:
     :param path: the path to the metadata file
     :return: a ModelMetadata instance
     """
+    logging.debug(f"Loading model metadata from {path}")
     file_path = os.path.join(path, ModelMetadata.FILE_NAME)
     with open(file_path, 'r') as f:
         file = json.load(f)
@@ -63,6 +66,7 @@ def save_model(model: Model, path: os.path) -> None:
     os.makedirs(path, exist_ok=True)
     # Save model in SaveModel's format
     keras_model = model.model
+    logging.debug(f"Saving model {model.model_id} as SaveModel to {path}")
     keras_model.save(path)
     # Save model's bytes in TFLite format
     model_bytes: bytes = _to_tflite_model_bytes(model.model)
@@ -77,6 +81,7 @@ def save_model_as_tflite(model_bytes: bytes, metadata: ModelMetadata, path: os.p
     :param metadata: The metadata of the model to save
     :param path: The path to save the model to
     """
+    logging.debug(f"Saving model {metadata.model_id} as TFLite to {path}")
     os.makedirs(path, exist_ok=True)
     _save_model_metadata(metadata, path)
     model_path = get_model_tflite_path(path, metadata.model_id)

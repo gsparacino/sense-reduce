@@ -9,16 +9,14 @@ from sensor.abstract_sensor import AbstractSensor
 class MultivariateDataframeMockSensor(AbstractSensor):
     BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
-    def __init__(self, df: DataFrame) -> None:
+    def __init__(self, df: DataFrame, features: list[str]) -> None:
         """
         A multivariate sensor that returns pre-defined data, loaded from a Pandas' DataFrame.
 
         :param data: the Dataframe containing the sensor data.
         """
         super().__init__()
-        # TODO this list should always match the model's input layer, make the coupling more explicit?
-        #  i.e. the Sensor could receive an array of features upon registration to the BS
-        self.features = ['TL', 'P', 'RF', 'SO', 'RR', 'DD']
+        self.features = features
         self.data = df
         self.iterator = df.iterrows()
 

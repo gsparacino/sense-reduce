@@ -18,8 +18,8 @@ class DataStorage:
     def __init__(self, input_features: List[str], output_features: List[str]) -> None:
         self._measurements = pd.DataFrame(columns=input_features, dtype=np.float64)
         self._predictions = pd.DataFrame(columns=output_features, dtype=np.float64)
-        self._horizon = pd.DataFrame(columns=output_features, dtype=np.float64)
-        self._model_activity = pd.DataFrame(columns=[_MODEL_ID_COLUMN, _VIOLATION_FLAG_COLUMN])
+        self._horizon_updates = pd.DataFrame(columns=[_MODEL_ID_COLUMN])
+        self._activity_log = pd.DataFrame(columns=[_MODEL_ID_COLUMN, _VIOLATION_FLAG_COLUMN])
 
     @property
     def mae(self) -> pd.Series:
@@ -104,10 +104,13 @@ class DataStorage:
 
     def add_prediction(self, model_id: str, dt: datetime.datetime, values: np.ndarray):
         self._predictions.loc[dt] = values
-        self._model_activity.loc[dt] = [model_id, False]
+        self._activity_log.loc[dt] = [model_id, False]
 
     def add_violation(self, dt: datetime.datetime, model_id: str):
-        self._model_activity.loc[dt] = [model_id, True]
+        self._activity_log.loc[dt] = [model_id, True]
+
+    def get_violations(self) -> pd.DataFrame:
+        return  self._activity_log[self._activity_log[_VIOLATION_FLAG_COLUMN]]
 
     def add_measurement_dict(self, d: dict):
         for date_string, values in d.items():
@@ -119,9 +122,8 @@ class DataStorage:
     def add_prediction_df(self, df: pd.DataFrame):
         self._predictions = pd.concat([self._predictions, df], copy=False)
 
-    def update_horizon(self, df: pd.DataFrame):
-        previous_predictions = self._horizon[:df.index.min()]
-        self._horizon = pd.concat([previous_predictions, df], copy=False)
+    def add_horizon_update(self, timestamp: datetime.datetime, model_id: str):
+        self._horizon_updates.loc[timestamp] = [model_id]
 
     def copy(self, deep=True) -> 'DataStorage':
         """Returns a deep copy of this object. Note that the csv_path is also equal unless changed afterwards."""
@@ -136,11 +138,11 @@ class DataStorage:
     def get_predictions(self) -> pd.DataFrame:
         return self._predictions
 
-    def get_model_activity(self) -> pd.DataFrame:
-        return self._model_activity
+    def get_prediction_horizon_updates(self) -> pd.DataFrame:
+        return self._horizon_updates
 
-    def get_horizon(self) -> pd.DataFrame:
-        return self._horizon
+    def get_model_activity(self) -> pd.DataFrame:
+        return self._activity_log
 
     def get_previous_measurements(self,
                                   until_dt: datetime.datetime,

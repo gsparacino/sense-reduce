@@ -8,19 +8,18 @@ import pandas as pd
 from flask import request, send_file, g, Flask
 
 from base import config
-from base.base_adaptive_strategy import DefaultBaseStationAdaptiveStrategy
+from base.base_adaptive_strategy import adaptive_strategy_factory
 from base.cluster_manager import ClusterManager
+from base.learning_strategy import learning_strategy_factory
 from base.model_manager import ModelManager
-from base.model_trainer import RetrainLearningStrategy
 from common import ThresholdMetric, LogEvent, LogEventType
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
 model_manager = ModelManager(config)
-# TODO: make number of epochs configurable
-model_trainer = RetrainLearningStrategy(epochs=10)
-adaptive_strategy = DefaultBaseStationAdaptiveStrategy(config, model_manager, model_trainer)
-cluster_manager = ClusterManager(config, model_manager, model_trainer, adaptive_strategy)
+learning_strategy = learning_strategy_factory(config)
+adaptive_strategy = adaptive_strategy_factory(learning_strategy, model_manager, config)
+cluster_manager = ClusterManager(config, model_manager, learning_strategy, adaptive_strategy)
 
 profiler = config.profiler
 event_logger = config.event_logger
@@ -89,7 +88,7 @@ def register_node():
     payload = dict()
     payload['model_metadata'] = model.metadata.to_dict()
     payload['portfolio'] = cluster_manager.get_recommended_models(node_id)
-    logging.debug(f'Responding to new node with payload: {payload}')
+    payload['initial_df'] = initial_df.to_json()
     return payload
 
 
@@ -97,8 +96,10 @@ def register_node():
 def post_violation(node_id: str):
     logging.info(f'Node {node_id} sent a violation notification')
     body = request.get_json(force=True)
-    event_logger.log_event(LogEvent(node_id, LogEventType.VIOLATION))
-    cluster_manager.add_violation(node_id, body['timestamp'], body['model'])
+    timestamp = body['timestamp']
+    model = body['model']
+    event_logger.log_event(LogEvent(node_id, LogEventType.VIOLATION, model))
+    cluster_manager.add_violation(node_id, timestamp, model)
     if body.get('measurements') is not None:
         measurements: pd.DataFrame = pd.read_json(body.get('measurements'))
         cluster_manager.add_measurements(node_id, measurements)

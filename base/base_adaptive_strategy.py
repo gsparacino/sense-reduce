@@ -8,7 +8,7 @@ import pandas as pd
 from base import Config
 from base.model import ModelID, Model
 from base.model_manager import ModelManager
-from base.model_trainer import LearningStrategy
+from base.learning_strategy import LearningStrategy
 from base.node_manager import NodeManager, NodeID
 from common import ModelMetadata
 from common.resource_profiler import profiled
@@ -39,12 +39,40 @@ class BaseStationAdaptiveStrategy(ABC):
         pass
 
 
-class DefaultBaseStationAdaptiveStrategy(BaseStationAdaptiveStrategy):
+class FixedPortfolioAdaptiveStrategy(BaseStationAdaptiveStrategy):
 
-    def __init__(self, config: Config, model_manager: ModelManager, model_trainer: LearningStrategy):
+    def __init__(self, model_manager: ModelManager):
+        """
+        An adaptive strategy that keeps the initial set of models, without training new ones. Requests for new models
+        coming from SNs are ignored.
+
+        Args:
+            model_manager: a ModelManager that handles I/O of all models in the portfolio
+        """
+        self._model_manager = model_manager
+
+    def get_recommended_models(self, node: NodeManager, cluster_nodes: List[NodeManager]) -> List[ModelID]:
+        return self._model_manager.get_all_models()
+
+    def handle_new_model_request(self, node: NodeManager, node_portfolio: List[ModelID],
+                                 cluster_nodes: List[NodeManager]) -> None:
+        pass
+
+
+class TrainAndDeployAdaptiveStrategy(BaseStationAdaptiveStrategy):
+
+    def __init__(self, config: Config, model_manager: ModelManager, learning_strategy: LearningStrategy):
+        """
+        An adaptive strategy that trains new models whenever an SN requests one.
+
+        Args:
+            config: a Config object with the BS configuration parameters
+            model_manager: a ModelManager that handles I/O of all models in the portfolio
+            learning_strategy: the LearningStrategy used to train new models when necessary
+        """
         self._config = config
         self._model_manager = model_manager
-        self._model_trainer = model_trainer
+        self._learning_strategy = learning_strategy
         self._training_threads: dict[NodeID, threading.Thread] = {}
 
     def get_recommended_models(self, node: NodeManager, cluster_nodes: List[NodeManager]) -> List[ModelID]:
@@ -93,6 +121,26 @@ class DefaultBaseStationAdaptiveStrategy(BaseStationAdaptiveStrategy):
         :return: the new Model
         """
         base_model: Model = self._model_manager.base_model
-        new_model = self._model_trainer.train_new_model(base_model.model, model_metadata, data)
+        new_model = self._learning_strategy.train_new_model(base_model.model, model_metadata, data)
         self._model_manager.save_model(new_model)
         return new_model
+
+
+def adaptive_strategy_factory(learning_strategy: LearningStrategy,
+                              model_manager: ModelManager,
+                              config: Config) -> BaseStationAdaptiveStrategy:
+    if config.adaptive_strategy:
+        match config.adaptive_strategy.lower():
+            case "train_deploy":
+                logging.debug("Using TrainAndDeployAdaptiveStrategy as BaseStationAdaptiveStrategy")
+                return TrainAndDeployAdaptiveStrategy(config, model_manager, learning_strategy)
+            case "fixed":
+                logging.debug("Using FixedPortfolioAdaptiveStrategy as BaseStationAdaptiveStrategy")
+                return FixedPortfolioAdaptiveStrategy(model_manager)
+            case _:
+                logging.debug(
+                    "No strategy matches config.yaml's parameter adaptive_strategy, using default "
+                    "(FixedPortfolioAdaptiveStrategy)"
+                )
+                return FixedPortfolioAdaptiveStrategy(model_manager)
+    logging.debug("Missing parameter adaptive_strategy in config.yaml, using default (FixedPortfolioAdaptiveStrategy)")

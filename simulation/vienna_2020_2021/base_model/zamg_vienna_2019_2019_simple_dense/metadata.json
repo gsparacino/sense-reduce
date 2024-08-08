@@ -1,0 +1,53 @@
+{
+  "uuid": "zamg_vienna_2019_2019_simple_dense",
+  "model_id": "zamg_vienna_2019_2019_simple_dense",
+  "input_features": [
+    "TL",
+    "P",
+    "RF",
+    "SO"
+  ],
+  "output_features": [
+    "TL"
+  ],
+  "input_shape": [
+    1,
+    120,
+    8
+  ],
+  "output_shape": [
+    1,
+    24,
+    1
+  ],
+  "periodicity": [
+    "day",
+    "year"
+  ],
+  "normalization_mean": [
+    14.871072984749457,
+    995.2527151416123,
+    59.013888888888886,
+    1053.897385620915
+  ],
+  "normalization_std": [
+    8.909478032746524,
+    7.909731591152052,
+    15.662470086696423,
+    1487.361734445307
+  ],
+  "context": {
+    "training": {
+      "stride": 6,
+      "sampling_rate": 6,
+      "val_loss": 0.30670809745788574,
+      "val_mean_squared_error": 0.08535297214984894,
+      "val_mean_absolute_error": 0.2133147120475769,
+      "val_root_mean_squared_error": 0.2921523153781891,
+      "test_loss": 0.2974816560745239,
+      "test_mean_squared_error": 0.07836336642503738,
+      "test_mean_absolute_error": 0.20509475469589233,
+      "test_root_mean_squared_error": 0.2799345850944519
+    }
+  }
+}

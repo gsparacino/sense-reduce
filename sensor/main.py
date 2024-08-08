@@ -7,8 +7,9 @@ import uuid
 
 import requests
 
-from common import ThresholdMetric, L2Threshold
+from common import ThresholdMetric, L2Threshold, DataStorage
 from common.resource_profiler import init_profiler
+from common.violation_monitor import TimeWindowViolationsMonitor
 from sensor.abstract_sensor import AbstractSensor
 from sensor.base_station_gateway import HttpBaseStationGateway
 from sensor.model_manager import ModelManager
@@ -26,9 +27,7 @@ if profile_log_path is not None:
 def run(threshold_metric: ThresholdMetric,
         base_address: str,
         data_reduction_mode: str,
-        wifi_toggle: bool,
         time_interval: float,
-        cooldown: float,
         prediction_interval: float,
         sensor: AbstractSensor
         ) -> None:
@@ -38,9 +37,7 @@ def run(threshold_metric: ThresholdMetric,
         threshold_metric (ThresholdMetric): The metric used to determine if a threshold has been reached.
         base_address (str): The address of the base station, e.g., "192.168.0.1:100".
         data_reduction_mode (str): The data reduction mode applied, either "none" or "predict".
-        wifi_toggle (bool): A flag indicating whether Wi-Fi should be turned off between transmissions.
         time_interval (float): The regular interval in seconds for checking the sensor's readings.
-        cooldown (float): The minimum time interval between consecutive violations to which the sensor should react.
         prediction_interval (float): The time interval between consecutive predictions in the Prediction Horizon.
         sensor (AbstractSensor): The implementation of AbstractSensor from which measurements are collected
 
@@ -70,11 +67,23 @@ def run(threshold_metric: ThresholdMetric,
     elif data_reduction_mode == 'predict':
         node_initialization = base_station.register_node(NODE_ID, threshold_metric_to_dict)
         model_manager.synchronize_models(node_initialization.portfolio)
+        base_model = node_initialization.current_model
+        data_storage = node_initialization.initial_df
 
-        # TODO: make strategy configurable
+        # TODO: make these parameters configurable
+        violation_time_window = datetime.timedelta(seconds=2 * prediction_interval)
+        violations_monitor = TimeWindowViolationsMonitor(violation_time_window, 3)
         adaptive_strategy = (
-            DefaultSensorNodeAdaptiveStrategy(threshold_metric, model_manager, base_station,
-                                              datetime.timedelta(seconds=cooldown), 3)
+            DefaultSensorNodeAdaptiveStrategy(
+                NODE_ID,
+                base_model,
+                threshold_metric,
+                model_manager,
+                base_station,
+                violations_monitor,
+                data_storage,
+                prediction_interval
+            )
         )
 
         sensor_manager = (
@@ -146,10 +155,6 @@ if __name__ == '__main__':
                         help='The time interval between consecutive predictions in the Prediction Horizon, '
                              'in seconds (defaults to 30.0).'
                         )
-    parser.add_argument('--cooldown', type=float, default=60.0,
-                        help='The "grace period" (in seconds, defaults to 60) between consecutive violations, i.e. a '
-                             'time interval during which the sensor does not react to threshold violations.'
-                        )
     parser.add_argument('--threshold', type=float, default=1.0,
                         help='The threshold in degrees Celsius above which to report to the base station, default: 1.0.'
                         )
@@ -179,8 +184,8 @@ if __name__ == '__main__':
     elif ARGS.sensor == 'mock':
         if ARGS.csv is not None:
             from multivariate_sensor_mock_csv import MultivariateCsvMockSensor
-
-            sensor = MultivariateCsvMockSensor(ARGS.csv)
+            # TODO: features should be configurable
+            sensor = MultivariateCsvMockSensor(ARGS.csv, ['TL', 'P', 'RF', 'SO'])
         else:
             from temperature_sensor_mock_random import RandomMockSensor
 
@@ -191,4 +196,4 @@ if __name__ == '__main__':
 
     NODE_ID = ARGS.id
     THRESHOLD = L2Threshold(ARGS.threshold, [0], [0])
-    run(THRESHOLD, ARGS.base, ARGS.mode, ARGS.wifi, ARGS.interval, ARGS.cooldown, ARGS.prediction_interval, sensor)
+    run(THRESHOLD, ARGS.base, ARGS.mode, ARGS.interval, ARGS.prediction_interval, sensor)

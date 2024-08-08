@@ -14,7 +14,6 @@ class PredictionHorizon:
 
     def __init__(self, df: pd.DataFrame) -> None:
         self.df = df
-        self._tmp = df.copy()
 
     def __str__(self) -> str:
         return self.df.__str__()
@@ -36,13 +35,12 @@ class PredictionHorizon:
         The pandas.Series is indexed by the output features."""
         if not self.in_prediction_horizon(dt):
             raise ValueError(f'Datetime {dt} is out of range of prediction horizon {self.start} - {self.end}')
-
         try:
-            return self._tmp.loc[dt]
+            return self.df.loc[dt]
         except KeyError:
-            self._tmp.loc[dt] = np.nan
-            self._tmp.interpolate(method='time', inplace=True)
-            return self._tmp.loc[dt]
+            self.df.loc[dt] = np.nan
+            self.df.interpolate(method='time', inplace=True)
+            return self.df.loc[dt]
 
 
 class Predictor:
@@ -79,24 +77,33 @@ class Predictor:
     def prediction_period(self):
         return self._prediction_period
 
-    def set_model(self, other: PredictionModel, start: datetime):
+    def set_model(self, other: PredictionModel, start: datetime) -> None:
         """Changes the underlying model of the predictor and resets the prediction horizon to the specified datetime."""
         logging.debug(f'Changing predictor model from "{self._model.metadata.model_id}" to "{other.metadata.model_id}"')
         self._model = other
         self._prediction_horizon = None
         self.update_prediction_horizon(start)
 
-    def add_measurement(self, dt: datetime, values: np.ndarray):
+    def add_measurement(self, dt: datetime, values: np.ndarray) -> None:
         self._data.add_measurement(dt, values)
 
-    def add_measurement_df(self, df: pd.DataFrame):
+    def add_prediction_horizon_update(self, timestamp: datetime) -> None:
+        self._data.add_horizon_update(timestamp, self.model_id)
+
+    def add_measurement_df(self, df: pd.DataFrame) -> None:
         self._data.add_measurement_df(df)
 
-    def log_prediction(self, dt: datetime, values: np.ndarray):
+    def log_prediction(self, dt: datetime, values: np.ndarray) -> None:
         self._data.add_prediction(self.model_id, dt, values)
 
-    def add_prediction_df(self, df: pd.DataFrame):
+    def add_prediction_df(self, df: pd.DataFrame) -> None:
         self._data.add_prediction_df(df)
+
+    def add_violation(self, dt: datetime) -> None:
+        self._data.add_violation(dt, self.model_id)
+
+    def get_violations(self):
+        return self._data.get_violations()
 
     def get_measurements_in_current_prediction_horizon(self, until: datetime) -> Optional[pd.DataFrame]:
         """Returns the measurements in the current horizon until the specified datetime (inclusive)."""
@@ -139,7 +146,13 @@ class Predictor:
         """
         :return: A pandas.DataFrame containing all the values of the node's Prediction Horizon.
         """
-        return self._data.get_horizon()
+        return self._prediction_horizon.df
+
+    def get_prediction_horizon_updates(self) -> pd.DataFrame:
+        """
+        :return: A pandas.DataFrame containing the timestamps of the logged Prediction Horizon Update events.
+        """
+        return self._data.get_prediction_horizon_updates()
 
     def get_model_activity(self) -> pd.DataFrame:
         """
@@ -175,15 +188,8 @@ class Predictor:
         logging.debug(f'New prediction horizon: \n {self._prediction_horizon}')
 
     @profiled(tag="Prediction")
-    def update_prediction_horizon(self, start: datetime):
+    def update_prediction_horizon(self, start: datetime) -> None:
         """Updates the interpolation points used for computing predictions. """
-        # if self._prediction_horizon is not None and \
-        #         self._prediction_horizon.df.index[0] <= start < self._prediction_horizon.df.index[1]:
-        #     logging.debug(f'Skipped updating prediction horizon because nothing would change: '
-        #                   f'{self._prediction_horizon.df.index[0]} <= {start} < {self._prediction_horizon.df.index[1]}'
-        #                   )
-        #     return
-
         previous_m = self._data.get_previous_measurements(start,
                                                           self._model.metadata.input_length,
                                                           self._prediction_period)
@@ -193,14 +199,13 @@ class Predictor:
         last_ts = previous_m.index.max()
         new_horizon.loc[last_ts] = previous_m.loc[last_ts, self.model_metadata.output_features]
         new_horizon.sort_index(inplace=True)
-        self._data.update_horizon(new_horizon)
-
-        previous_ip = self._prediction_horizon
         self._prediction_horizon = PredictionHorizon(new_horizon)
-        logging.debug(f'Updated prediction horizon from\n{previous_ip}\nto\n{self._prediction_horizon}')
+
+    def adjust_prediction_horizon(self, diff: np.array) -> None:
+        diff_df = pd.DataFrame([diff], columns=self._prediction_horizon.df.columns)
+        logging.debug(f'Adapting predictions by {diff_df}')
+        new_horizon = self._prediction_horizon.df + diff_df.loc[0]
+        self._prediction_horizon = PredictionHorizon(new_horizon)
 
     def get_prediction_timedelta(self):
         return self._prediction_period
-
-    def log_violation(self, dt: datetime) -> None:
-        self._data.add_violation(dt, self.model_id)

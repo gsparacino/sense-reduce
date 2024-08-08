@@ -12,10 +12,15 @@ from common import DataStorage, ModelMetadata
 
 
 class NodeInitialization:
-    def __init__(self, node_id: str, current_model: ModelMetadata, portfolio: list[str]):
+    def __init__(self,
+                 node_id: str,
+                 current_model: ModelMetadata,
+                 portfolio: list[str],
+                 initial_df: DataStorage = None):
         self.node_id: str = node_id
         self.current_model: ModelMetadata = current_model
         self.portfolio: list[str] = portfolio
+        self.initial_df: DataStorage = initial_df
 
 
 class BaseStationGateway(ABC):
@@ -32,8 +37,8 @@ class BaseStationGateway(ABC):
         :param node_id: ID of the sensor node, as a string.
         :param threshold_metric: The metric used to determine if a threshold has been reached, as a dict.
 
-        :return: A tuple with: an instance of common.ModelMetadata containing the model's metadata; an instance of
-        common.DataStorage containing the initial data for the model.
+        :return: A NodeInitialization object with: an instance of ModelMetadata, containing the model's metadata;
+        an instance of common.DataStorage containing the initial data for the model.
         """
         pass
 
@@ -78,8 +83,8 @@ class BaseStationGateway(ABC):
                     measurements: pd.DataFrame
                     ) -> Optional[list[str]]:
         """
-        Synchronizes with the Base Station, sending the latest measurements (if appropriate)and fetching the list of
-        models available for the sensor.
+        Synchronizes with the Base Station, sending the latest measurements and fetching the list of models available
+        for the sensor.
 
         :param node_id: The node's unique ID.
         :param dt: The timestamp of the synchronization, i.e. the timestamp at which the latest measurement was read,
@@ -142,8 +147,9 @@ class HttpBaseStationGateway(BaseStationGateway):
 
         model_metadata = self._extract_model_metadata(response)
         portfolio = self._extract_models_portfolio(response)
+        initial_df = self._extract_initial_df(response, model_metadata)
 
-        return NodeInitialization(node_id, model_metadata, portfolio)
+        return NodeInitialization(node_id, model_metadata, portfolio, initial_df)
 
     def send_measurement(self, node_id: str, dt: datetime.datetime, measurement: pd.Series) -> None:
         body = {

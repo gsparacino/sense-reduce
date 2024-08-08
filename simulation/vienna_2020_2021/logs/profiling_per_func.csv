@@ -1,0 +1,9 @@
+func_,elapsed_time_ms_50pct,elapsed_time_ms_68pct,elapsed_time_ms_95pct,cpu_time_ms_50pct,cpu_time_ms_68pct,cpu_time_ms_95pct,peak_memory_usage_MB_50pct,peak_memory_usage_MB_68pct,peak_memory_usage_MB_95pct,received_data_B_50pct,received_data_B_68pct,received_data_B_95pct,transmitted_data_B_50pct,transmitted_data_B_68pct,transmitted_data_B_95pct
+_find_better_predictor,1055.275,1107.5020000000002,1780.575,460.935,490.62800000000004,757.8125,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+_synchronize_with_base_station,2078.81,2080.978,2103.45,15.62,15.62,39.0625,9.92,9.92,9.94,0.0,0.0,0.0,0.0,0.0,0.0
+get_model,15.815,21.5084,30.048499999999997,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,7204.0,7204.0,7204.0
+get_model_metadata,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,776.5,777.76,779.65
+ping,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4.0,4.0,4.0
+register_node,15.61,15.61,15.61,0.0,0.0,0.0,0.0,0.0,0.0,145.0,145.0,145.0,989122.0,989122.0,989122.0
+sync,15.595,15.758,24.71699999999999,0.0,0.0,0.0,0.0,0.0,0.0,360.0,402.96000000000004,827.3999999999967,371.0,371.0,371.0
+update_prediction_horizon,91.815,94.5844,141.3745,46.88,62.5,93.75,0.31,0.34,0.37,0.0,0.0,0.0,0.0,0.0,0.0

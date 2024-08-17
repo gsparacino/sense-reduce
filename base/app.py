@@ -16,20 +16,22 @@ from common import ThresholdMetric
 from common.model_metadata import ModelMetadata
 
 logging.basicConfig(level=logging.DEBUG)
+base_dir = os.path.abspath(os.path.dirname(__file__))
 
 # define the dataset for training the model(s)
-training_df = pd.read_pickle(app.config['TRAINING_DF'])
+training_df_path = os.path.join(base_dir, app.config['TRAINING_DF'])
+training_df = pd.read_pickle(str(training_df_path))
 logging.debug(f'Loaded the training dataset from "{app.config["TRAINING_DF"]}"')
 
 # configure the parameters of the initial model and the strategies applied by the base station
 base_model_id = app.config['BASE_MODEL_UUID']
-with open(os.path.join(app.config['MODEL_DIR'], f'{base_model_id}.json'), 'r') as fp:
+with open(os.path.join(base_dir, app.config['MODEL_DIR'], base_model_id, ModelMetadata.FILE_NAME), 'r') as fp:
     metadata = ModelMetadata.from_dict(json.load(fp))
-base_model = Model(tf.keras.models.load_model(os.path.join(app.config['MODEL_DIR'], base_model_id)), metadata)
+base_model = Model(tf.keras.models.load_model(os.path.join(base_dir, app.config['MODEL_DIR'], base_model_id)), metadata)
 # TODO: make the strategies configurable
 cl_strategy = NoUpdateStrategy()
 cl_strategy.add_model(base_model)
-node_manager = NodeManager(base_model, NoUpdateStrategy(), DeployOnceStrategy(), app.config['MODEL_DIR'])
+node_manager = NodeManager(NoUpdateStrategy(), DeployOnceStrategy(), app.config['MODEL_DIR'])
 logging.info(f'Loaded initial model with ID={base_model_id} and started node manager')
 
 

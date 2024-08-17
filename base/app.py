@@ -18,20 +18,23 @@ from common.model_metadata import ModelMetadata
 logging.basicConfig(level=logging.DEBUG)
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
+# configure the parameters of the initial model and the strategies applied by the base station
+model_dir = os.path.join(base_dir, app.config['MODEL_DIR'])
+base_model_id = app.config['BASE_MODEL_UUID']
+with open(os.path.join(str(model_dir), base_model_id, ModelMetadata.FILE_NAME), 'r') as fp:
+    metadata = ModelMetadata.from_dict(json.load(fp))
+base_model = Model(tf.keras.models.load_model(os.path.join(base_dir, app.config['MODEL_DIR'], base_model_id)), metadata)
+
 # define the dataset for training the model(s)
 training_df_path = os.path.join(base_dir, app.config['TRAINING_DF'])
 training_df = pd.read_pickle(str(training_df_path))
+training_df = training_df[metadata.input_features]
 logging.debug(f'Loaded the training dataset from "{app.config["TRAINING_DF"]}"')
 
-# configure the parameters of the initial model and the strategies applied by the base station
-base_model_id = app.config['BASE_MODEL_UUID']
-with open(os.path.join(base_dir, app.config['MODEL_DIR'], base_model_id, ModelMetadata.FILE_NAME), 'r') as fp:
-    metadata = ModelMetadata.from_dict(json.load(fp))
-base_model = Model(tf.keras.models.load_model(os.path.join(base_dir, app.config['MODEL_DIR'], base_model_id)), metadata)
 # TODO: make the strategies configurable
 cl_strategy = NoUpdateStrategy()
 cl_strategy.add_model(base_model)
-node_manager = NodeManager(NoUpdateStrategy(), DeployOnceStrategy(), app.config['MODEL_DIR'])
+node_manager = NodeManager(cl_strategy, DeployOnceStrategy(), str(model_dir))
 logging.info(f'Loaded initial model with ID={base_model_id} and started node manager')
 
 
@@ -40,12 +43,12 @@ def register_node(node_id: str):
     """Registers a new node and returns the model metadata and initial data for the node."""
     body: dict = request.get_json(force=True)
     threshold_metric = ThresholdMetric.from_dict(body['threshold_metric'])
-    initial_df = pd.read_json(body.get('initial_df'))
-    logging.info(f'New node with ID={node_id}, threshold={threshold_metric}, and initial_df={initial_df} registered')
-
+    initial_df = body.get('initial_df')
     if initial_df is None:
         initial_df = training_df
-    # TODO: test
+    else:
+        initial_df = pd.read_json(initial_df)
+    logging.info(f'New node registration with ID={node_id}, threshold={threshold_metric}, and initial_df\n{initial_df}')
     node = node_manager.add_node(node_id, threshold_metric, initial_df, datetime.now())
     payload = dict()
     payload['model_metadata'] = node.predictor.model_metadata.to_dict()

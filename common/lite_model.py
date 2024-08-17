@@ -82,7 +82,8 @@ class LiteModel(PredictionModel):
             A pandas DataFrame with DatetimeIndex
         """
         last_ts = input_df.index.max()
-        input_df = (input_df - self.metadata.input_normalization_mean) / self.metadata.input_normalization_std
+        features = self.metadata.input_features
+        input_df = (input_df[features] - self.metadata.input_normalization_mean) / self.metadata.input_normalization_std
         convert_datetime(input_df, self.metadata.periodicity)
 
         # TFLite interpreter invocation

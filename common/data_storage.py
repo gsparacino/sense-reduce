@@ -49,9 +49,10 @@ class DataStorage:
         while i <= end:
             j = i - datetime.timedelta(days=365)  # this way we don't have to consider Feb 29 separately
             previous_values = pd.DataFrame(columns=previous.columns)
-            value = previous.loc[j]
+            previous_idx = previous.index.get_indexer([j], method='nearest')
+            value = previous.iloc[previous_idx]
             while value is not None:
-                previous_values.loc[j] = value
+                previous_values = previous_values.append(value)
                 j -= datetime.timedelta(days=365)
                 try:
                     value = previous.loc[j]

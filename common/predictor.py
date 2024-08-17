@@ -119,7 +119,8 @@ class Predictor:
         if self._prediction_horizon is None:
             logging.error(f'Cannot adapt non-existing interpolation points!')
             return
-        diff = measurement[self.model_metadata.input_to_output_indices] - prediction
+        output_measurements = [measurement[i] for i in self.model_metadata.input_to_output_indices]
+        diff = output_measurements - prediction
         logging.debug(f'Adapting prediction at {dt} by {diff}')
         self._prediction_horizon = PredictionHorizon(self._prediction_horizon.df + diff)
         logging.debug(f'New prediction horizon: {self._prediction_horizon}')

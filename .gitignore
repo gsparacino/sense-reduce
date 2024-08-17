@@ -1,3 +1,4 @@
 simulation/zamg/data
-simulation/zamg/*.pickle
+*.pickle
 .idea
+**/models

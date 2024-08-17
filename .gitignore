@@ -2,3 +2,4 @@ simulation/zamg/data
 *.pickle
 .idea
 **/models
+*.tflite

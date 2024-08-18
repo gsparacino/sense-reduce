@@ -4,6 +4,7 @@ import time
 
 from abstract_sensor import AbstractSensor
 from common import Predictor, ThresholdMetric
+from sensor.base_station_gateway import BaseStationGateway
 
 
 class PredictingMonitor:
@@ -18,14 +19,18 @@ class PredictingMonitor:
         self.sensor = sensor
         self.predictor = predictor
 
-    def monitor(self, threshold_metric: ThresholdMetric, interval_seconds: float, violation_callback, update_callback):
+    def monitor(self,
+                node_id: str,
+                threshold_metric: ThresholdMetric,
+                interval_seconds: float,
+                base_station_gateway: BaseStationGateway) -> None:
         """Starts monitoring the sensor and calls the callback_fn if a threshold violation occurs.
 
         Args:
+            node_id: The unique id of the sensor node.
             threshold_metric: A metric implementation that defines a threshold violation.
             interval_seconds: Defines the regular checking interval in seconds.
-            violation_callback: Function called with (current_datetime, measurement, new_data) if threshold violated.
-            update_callback: Function called with (current_datetime, new_data) at the end of a prediction horizon.
+            base_station_gateway: An instance of BaseStationGateway that handles all exchanges with the base station.
         """
         while True:
             measurement = self.sensor.measurement
@@ -43,7 +48,9 @@ class PredictingMonitor:
                 # TODO: keep track of last synchronization and only send required data
                 new_data = p.get_measurements_in_current_prediction_horizon(now)
                 p.update_prediction_horizon(now)
-                update_callback(now, new_data)
+                new_predictor = base_station_gateway.send_update(node_id, now, new_data, p)
+                if new_predictor is not None:
+                    self.predictor = new_predictor
                 prediction = p.get_prediction_at(now)
 
             p.add_prediction(now, prediction.to_numpy())
@@ -51,7 +58,9 @@ class PredictingMonitor:
             if threshold_metric.is_threshold_violation(measurement, prediction.to_numpy()):
                 # TODO: keep track of last synchronization and only send required data
                 new_data = p.get_measurements_in_current_prediction_horizon(now)
-                violation_callback(now, measurement, new_data)
+                new_predictor = base_station_gateway.send_violation(node_id, now, measurement.to_numpy(), new_data, p)
+                if new_predictor is not None:
+                    self.predictor = new_predictor
                 p.update_prediction_horizon(now)
                 p.adjust_to_measurement(now, measurement.to_numpy(), p.get_prediction_at(now).to_numpy())
 

@@ -39,17 +39,17 @@ def run(threshold_metric: ThresholdMetric,
                  f'threshold={threshold_metric} and base={base_address}...'
                  )
     sensor = TemperatureSensor()
-    base_station = BaseStationGateway(base_address=base_address)
+    base_station = BaseStationGateway(node_id=NODE_ID, base_address=base_address)
 
     if data_reduction_mode == 'none':
-        base_station.register_node(NODE_ID, threshold_metric)
+        base_station.register_node(threshold_metric)
         while True:
             current_time = datetime.datetime.now()
-            base_station.send_measurement(NODE_ID, current_time, sensor.measurement.values)
+            base_station.send_measurement(current_time, sensor.measurement.values)
             time.sleep(check_interval)
 
     elif data_reduction_mode == 'predict':
-        model, data = base_station.fetch_model_and_data(NODE_ID, threshold_metric)
+        model, data = base_station.fetch_model_and_data(threshold_metric)
         predictor = Predictor(model, data)
         predictor.update_prediction_horizon(datetime.datetime.now())
         monitor = PredictingMonitor(sensor, predictor)

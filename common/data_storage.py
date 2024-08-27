@@ -16,6 +16,8 @@ class DataStorage:
     def __init__(self, input_features: List[str], output_features: List[str]) -> None:
         self._measurements = pd.DataFrame(columns=input_features, dtype=np.float64)
         self._predictions = pd.DataFrame(columns=output_features, dtype=np.float64)
+        self._violations = pd.DataFrame(columns=["score"], dtype=np.float64)
+        self._horizon_updates = pd.DataFrame(columns=["model_uuid"])
 
     @property
     def mae(self) -> pd.Series:
@@ -73,6 +75,18 @@ class DataStorage:
         if prefix != '':
             return f'{prefix}_predictions.csv'
         return f'predictions.csv'
+
+    def add_violation(self, dt: datetime.datetime, score: float):
+        self._violations.loc[dt] = score
+
+    def get_violations(self) -> pd.DataFrame:
+        return self._violations
+
+    def add_horizon_update(self, dt: datetime.datetime, model: str):
+        self._horizon_updates.loc[dt] = model
+
+    def get_horizon_updates(self) -> pd.DataFrame:
+        return self._horizon_updates
 
     def add_measurement(self, dt: datetime.datetime, values: np.ndarray):
         self._measurements.loc[dt] = values

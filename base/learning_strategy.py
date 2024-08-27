@@ -9,6 +9,7 @@ from base.model import Model
 from base.node import NodeID
 from base.training import mse_weighted
 from base.window_generator import WindowGenerator
+from common import ModelMetadata
 from common.utils import convert_datetime, normalize_df, split_df
 
 
@@ -63,7 +64,7 @@ class LearningStrategy(ABC):
         return {
             'type': self.__class__.__name__,
             'object': self.__dict__
-            }
+        }
 
     @classmethod
     def from_dict(cls, d: dict) -> 'LearningStrategy':
@@ -103,7 +104,7 @@ class NoUpdateStrategy(LearningStrategy):
         return {
             'type': self.__class__.__name__,
             'object': {}
-            }
+        }
 
     def add_node(self, node_id: NodeID, initial_df: pd.DataFrame) -> None:
         return None
@@ -175,8 +176,8 @@ class TransferLearningStrategy(LearningStrategy):
                 'learning_rate': self.learning_rate,
                 'stride': self.stride,
                 'validation': None if self.validation is None else str(self.validation),
-                }
             }
+        }
 
     def _retrain_node_model(self, node_id: NodeID):
         model = self.node_id_to_model[node_id]
@@ -257,7 +258,7 @@ class TransferLearningStrategy(LearningStrategy):
             optimizer=self._get_optimizer(),
             loss=mse_weighted,
             metrics=[tf.metrics.MeanSquaredError(), tf.metrics.MeanAbsoluteError(), tf.metrics.RootMeanSquaredError()]
-            )
+        )
 
         # for new nodes, we do not retrain the model immediately
         self.node_id_to_changed[node_id] = False
@@ -336,8 +337,8 @@ class RetrainStrategy(LearningStrategy):
                 'stride': self.stride,
                 'validation': None if self.validation is None else str(self.validation),
                 'use_initial_data': self.use_initial_data,
-                }
             }
+        }
 
     def _get_optimizer(self) -> tf.optimizers.Optimizer:
         if self.optimizer_str == 'adam':
@@ -351,10 +352,12 @@ class RetrainStrategy(LearningStrategy):
         old_model = self.node_id_to_model[node_id].model
         md = self.node_id_to_model[node_id].metadata
         df = self.node_id_to_data[node_id]
-        convert_datetime(df, md.periodicity)
+        self.node_id_to_model[node_id] = self.train_model(df, md, old_model)
 
+    def train_model(self, data: pd.DataFrame, md: ModelMetadata, old_model: Model) -> Model:
+        convert_datetime(data, md.periodicity)
         if self.validation is None:
-            train_df = df.copy()
+            train_df = data.copy()
             val_df = None
             cb = None
         else:
@@ -367,11 +370,10 @@ class RetrainStrategy(LearningStrategy):
                                                      ),
                 tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=self.patience, restore_best_weights=True)]
             if isinstance(self.validation, float):
-                train_df, val_df, _ = split_df(df, 1 - self.validation, self.validation)
+                train_df, val_df, _ = split_df(data, 1 - self.validation, self.validation)
             else:  # self.validation is a timedelta
-                train_df = df.loc[:df.index[-1] - self.validation, :].copy()
-                val_df = df.loc[df.index[-1] - self.validation:, :].copy()
-
+                train_df = data.loc[:data.index[-1] - self.validation, :].copy()
+                val_df = data.loc[data.index[-1] - self.validation:, :].copy()
         # adjust the normalization values to the new data
         norm_mean, norm_std = normalize_df(md.input_features, train_df, [] if val_df is None else [val_df])
         window = WindowGenerator(md.input_length, md.output_length, self.stride,
@@ -382,7 +384,6 @@ class RetrainStrategy(LearningStrategy):
                                  input_features=md.input_features,
                                  output_features=md.output_features
                                  )
-
         # reset the model weights
         tf.keras.backend.clear_session()
         new_model = tf.keras.models.clone_model(old_model)
@@ -390,9 +391,8 @@ class RetrainStrategy(LearningStrategy):
             optimizer=self._get_optimizer(),
             loss=mse_weighted,
             metrics=[tf.metrics.MeanSquaredError(), tf.metrics.MeanAbsoluteError(), tf.metrics.RootMeanSquaredError()]
-            )
+        )
         new_model.fit(window.train, validation_data=window.val, epochs=self.max_epochs, callbacks=cb, verbose=2)
-
         # if the model did not improve, do not change
         md = md.deepcopy()
         # if self.validation is not None:
@@ -407,7 +407,7 @@ class RetrainStrategy(LearningStrategy):
         #         logging.info('No improvement found, keeping old model.')
         md.input_normalization_mean = norm_mean
         md.input_normalization_std = norm_std
-        self.node_id_to_model[node_id] = Model(new_model, md)
+        return Model(new_model, md)
 
     def add_model(self, model: Model) -> None:
         if self.base_model is None:

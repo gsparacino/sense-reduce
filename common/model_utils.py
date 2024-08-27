@@ -7,7 +7,7 @@ from typing import Any
 import tensorflow as tf
 
 from base.model import Model
-from common import ModelMetadata, PredictionModel, LiteModel
+from common import ModelMetadata, LiteModel
 
 
 def load_model_from_savemodel(path: os.path) -> Model:
@@ -49,7 +49,7 @@ def _load_model_metadata(path: str) -> ModelMetadata:
         return ModelMetadata.from_dict(file)
 
 
-def _to_tflite_model_bytes(model: tf.keras.Model) -> Any:
+def to_tflite_model_bytes(model: tf.keras.Model) -> Any:
     """Creates a TFLite model from this model."""
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]
@@ -69,7 +69,7 @@ def save_model(model: Model, path: os.path) -> None:
     logging.debug(f"Saving model {model.metadata.uuid} as SaveModel to {path}")
     keras_model.save(path)
     # Save model's bytes in TFLite format
-    model_bytes: bytes = _to_tflite_model_bytes(model.model)
+    model_bytes: bytes = to_tflite_model_bytes(model.model)
     save_model_as_tflite(model_bytes, model.metadata, path)
 
 
@@ -89,7 +89,7 @@ def save_model_as_tflite(model_bytes: bytes, metadata: ModelMetadata, path: os.p
         f.write(model_bytes)
 
 
-def load_model_tflite(model_dir: str) -> PredictionModel:
+def load_model_tflite(model_dir: str) -> LiteModel:
     if not os.path.isdir(model_dir):
         raise NotADirectoryError(f'Model directory {model_dir} does not exist')
     metadata = _load_model_metadata(model_dir)

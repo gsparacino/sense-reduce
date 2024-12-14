@@ -3,7 +3,8 @@ import logging
 import time
 
 from abstract_sensor import AbstractSensor
-from common import Predictor, ThresholdMetric
+from common.predictor import Predictor
+from common.threshold_metric import ThresholdMetric
 from sensor.base_station_gateway import BaseStationGateway
 
 

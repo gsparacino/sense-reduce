@@ -1,205 +1,240 @@
 import datetime
 import logging
+from abc import ABC, abstractmethod
 from typing import Optional
 
-import numpy as np
 import pandas as pd
 import requests
+from flask import Response
 from requests import RequestException
 
-from common import ThresholdMetric, ModelMetadata, LiteModel, Predictor, DataStorage
+from common.model_metadata import ModelMetadata
+from common.sensor_adaptation_goal import SensorAdaptationGoal
+from common.sensor_knowledge_update import SensorKnowledgeUpdate, SensorKnowledgeInitialization
 
 
-class BaseStationGateway:
+class BaseStationGateway(ABC):
 
-    def __init__(self, node_id: str, base_address: str):
-        """
-        A façade class that manages all exchanges with the Base Station.
+    @abstractmethod
+    def register_node(self,
+                      initial_df: Optional[pd.DataFrame],
+                      input_features: list[str],
+                      output_features: list[str],
+                      ) -> SensorKnowledgeInitialization:
+        pass
 
-        Args:
-            node_id: the unique ID of the sensor node
-            base_address: The HTTP url of the Base Station, e.g., "192.168.0.1:8080".
-        """
-        logging.debug(f"Initializing BaseStationGateway with base address: {base_address}")
-        self.base_address = base_address
-        self.node_id = node_id
-        response = requests.get(f'{self.base_address}/ping')
-        if not response.ok:
-            raise RequestException(
-                f'Base Station is unreachable. GET {self.base_address}/ping returned {response.status_code}'
-            )
-
-    def register_node(self, threshold_metric: ThresholdMetric) -> requests.Response:
-        """Registers the sensor node with the base station by providing its ID and threshold metric.
-
-        Args:
-            threshold_metric: The metric used to determine if a threshold has been reached.
-
-        Returns:
-            requests.Response: The response from the base station containing metadata and initial data in the body.
-
-        Raises:
-            requests.exceptions.RequestException: If an error occurs while sending the request.
-        """
-        body = {'threshold_metric': threshold_metric.to_dict()}
-        logging.debug(f'Registering node {self.node_id} with base station at {self.base_address}: {body}')
-        try:
-            response = requests.post(f'{self.base_address}/register/{self.node_id}', json=body)
-            response.raise_for_status()
-            return response
-        except requests.exceptions.RequestException as e:
-            logging.error(f'Registration failed: {e}')
-            raise
-
+    @abstractmethod
     def send_violation(self,
                        dt: datetime.datetime,
-                       measurement: np.ndarray,
-                       data: pd.DataFrame,
-                       predictor: Predictor
-                       ) -> Optional[Predictor]:
-        """
-        Sends a violation message to the base station, containing the timestamp of the violation, the measurement that
-        triggered it, and the data required for updating the prediction horizon.
-        """
-        body = {
-            'timestamp': dt.isoformat(),
-            'measurement': list(measurement),
-            'data': data.to_json(),
-        }
-        logging.debug(f'Node {self.node_id} handling violation by sending: {body}')
+                       configuration_id: str,
+                       measurement: pd.Series,
+                       data: pd.DataFrame
+                       ) -> SensorKnowledgeUpdate:
+        pass
 
-        try:
-            response = requests.post(f'{self.base_address}/violation/{self.node_id}', json=body)
-            response.raise_for_status()
-
-            body = response.json()
-
-            model_metadata = body.get('model_metadata')
-            if model_metadata is not None:
-                model_metadata = ModelMetadata.from_dict(model_metadata)
-                model = self.fetch_model(model_metadata)
-
-                new_predictor = Predictor(model, predictor.data)
-                new_predictor.update_prediction_horizon(dt)
-                return new_predictor
-
-        except requests.exceptions.RequestException as e:
-            logging.error(f'Error sending horizon update: {e}')
-            raise e
-
-    def fetch_model(self, model_metadata: ModelMetadata) -> LiteModel:
-        """Fetches the prediction model from the base station.
-
-        Args:
-            model_metadata: The metadata of the model to fetch.
-
-        Returns:
-            The prediction model loaded from a TensorFlow Lite file.
-
-        Raises:
-            requests.exceptions.RequestException: If an error occurs while sending the request or loading the model.
-        """
-        try:
-            r = requests.get(f'{self.base_address}/models/{self.node_id}')
-            file_name = f'{model_metadata.uuid}.tflite'
-            open(file_name, 'wb').write(r.content)
-            return LiteModel.from_tflite_file(file_name, model_metadata)
-        except requests.exceptions.RequestException as e:
-            logging.error(f'Failed to fetch prediction model from base station {self.base_address}: {e}')
-            raise
-
-    def fetch_model_and_data(self, threshold_metric: ThresholdMetric) -> (LiteModel, DataStorage):
-        """Fetches the prediction model and initial data from the base station.
-
-        Args:
-            threshold_metric: The metric used to determine if a threshold has been reached.
-
-        Returns:
-            A tuple with the prediction model loaded from a TensorFlow Lite file and the initial data used to train it.
-
-        Raises:
-            requests.exceptions.RequestException: If an error occurs while sending the request or loading the model.
-        """
-        try:
-            # Register the node to receive model metadata and initial data
-            response = self.register_node(threshold_metric)
-            body = response.json()
-
-            # Download the model file from the base station and load it into a LiteModel object
-            metadata = ModelMetadata.from_dict(body.get('model_metadata'))
-            model = self.fetch_model(metadata)
-
-            # Load the initial data into a DataStorage object
-            initial_df = pd.read_json(body.get('initial_df'))
-            logging.debug(f'Node {self.node_id} fetched initial data for prediction model: {initial_df}')
-            data = DataStorage(metadata.input_features, metadata.output_features)
-            data.add_measurement_df(initial_df)
-
-            return model, data
-
-        except (requests.exceptions.RequestException, ValueError) as e:
-            logging.error(f'Failed to fetch prediction model and data from base station: {e}')
-            raise
-
+    @abstractmethod
     def send_update(self,
                     dt: datetime.datetime,
                     data: pd.DataFrame,
-                    predictor: Predictor,
-                    ) -> Optional[Predictor]:
-        """Communicates a horizon update to the specified base address.
+                    configuration_id: str
+                    ) -> SensorKnowledgeUpdate:
+        pass
 
-        Args:
-            dt: The timestamp at which the horizon udpate is necessary a datetime object.
-            data: The (redcued) measurements that occured in the current prediction horizon as a NumPy array.
-            predictor: The Predictor currently used by the sensor.
+    @abstractmethod
+    def send_measurement(self,
+                         dt: datetime.datetime,
+                         measurement: pd.Series,
+                         configuration_id: str
+                         ) -> SensorKnowledgeUpdate:
+        pass
 
-        Raises:
-            requests.exceptions.RequestException: An error occurred while sending the horizon update.
+    @abstractmethod
+    def get_model_metadata(self, model_id: str) -> ModelMetadata:
+        """Fetches a specific prediction model's metadata from the Base Station.
 
+        :param model_id: ID of the model to fetch, as a string.
+
+        :return: The ModelMetadata of the model.
         """
+        pass
+
+    @abstractmethod
+    def sync(self, dt: datetime.datetime) -> SensorKnowledgeUpdate:
+        """
+        Synchronizes the sensor knowledge with the base station.
+
+        Returns
+            The sensor knowledge update received from the base station.
+        """
+        pass
+
+    @abstractmethod
+    def fetch_model(self, model_id: str) -> bytes:
+        pass
+
+
+class HttpBaseStationGateway(BaseStationGateway):
+
+    def __init__(self, node_id: str, base_address: str):
+        self.node_id = node_id
+        self.base_address = base_address
+        response = requests.get(f'{self.base_address}/ping')
+        if not response.ok:
+            raise RequestException(
+                f'Base Station is unreachable or unhealthy. GET {self.base_address}/ping returned {response.status_code}'
+            )
+
+    def register_node(self,
+                      initial_df: Optional[pd.DataFrame],
+                      input_features: list[str],
+                      output_features: list[str],
+                      ) -> SensorKnowledgeInitialization:
+        body = {
+            'input_features': input_features,
+            'output_features': output_features
+        }
+
+        if initial_df is not None:
+            body['initial_df'] = initial_df.to_json()
+
+        logging.debug(f'Registering node with base station at {self.base_address}')
+        response = requests.post(f'{self.base_address}/nodes', json=body)
+        if not response.ok:
+            raise RequestException(f'POST {self.base_address}/nodes returned {response.status_code}')
+        body = response.json()
+        node_id = body['node_id']
+        adaptation_goals = self._extract_adaptation_goals(response)
+        model_metadata = self._extract_model_metadata(response)
+        portfolio = self._extract_models_portfolio(response)
+        # TODO: add ability to receive initial data from BS
+
+        return SensorKnowledgeInitialization(
+            node_id=node_id,
+            adaptation_goals=adaptation_goals,
+            base_model_metadata=model_metadata,
+            models_portfolio=portfolio,
+            initial_df=initial_df
+        )
+
+    def send_violation(self,
+                       dt: datetime.datetime,
+                       configuration_id: str,
+                       measurement: pd.Series,
+                       data: pd.DataFrame) -> SensorKnowledgeUpdate:
+        body = {
+            'timestamp': dt.isoformat(),
+            'measurements': measurement.to_json(),
+            'configuration_id': configuration_id,
+            'data': data.to_json()
+        }
+        logging.debug(f'Violation event: {body}')
+        response = requests.post(f'{self.base_address}/nodes/{self.node_id}/violation', json=body)
+        if not response.ok:
+            raise RequestException(
+                f'POST {self.base_address}/nodes/{self.node_id}/violation returned {response.status_code}'
+            )
+
+        return self.to_knowledge_update(response)
+
+    def send_update(self, dt: datetime.datetime, data: pd.DataFrame, configuration_id: str) -> SensorKnowledgeUpdate:
         body = {
             'timestamp': dt.isoformat(),
             'data': data.to_json(),
+            'configuration_id': configuration_id
         }
-        logging.debug(f'Node {self.node_id} sending horizon update: {body}')
+        logging.debug(f'Horizon update event @ {dt.isoformat()}')
 
-        try:
-            response = requests.post(f'{self.base_address}/update/{self.node_id}', json=body)
-            response.raise_for_status()
+        response = requests.post(f'{self.base_address}/nodes/{self.node_id}/update', json=body)
+        if not response.ok:
+            raise RequestException(
+                f'POST {self.base_address}/nodes/{self.node_id}/sync  returned {response.status_code}')
 
-            body = response.json()
-            model_metadata = body.get('model_metadata')
-            if model_metadata is not None:
-                model_metadata = ModelMetadata.from_dict(model_metadata)
-                model = self.fetch_model(model_metadata)
+        return self.to_knowledge_update(response)
 
-                new_predictor = Predictor(model, predictor.data)
-                new_predictor.update_prediction_horizon(dt)
-                return new_predictor
-
-        except requests.exceptions.RequestException as e:
-            logging.error(f'Error sending horizon update: {e}')
-            raise e
-
-    def send_measurement(self, dt: datetime.datetime, measurement: np.ndarray):
-        """Sends a single measurement to the specified base address.
-
-        Args:
-            dt: The measurement's timestamp as a datetime object.
-            measurement: The measurement as a NumPy array.
-
-        Raises:
-            requests.exceptions.RequestException: An error occurred while sending the measurement.
-
-        """
+    def send_measurement(self,
+                         dt: datetime.datetime,
+                         measurement: pd.Series,
+                         configuration_id: str) -> SensorKnowledgeUpdate:
         body = {
             'timestamp': dt.isoformat(),
-            'measurement': list(measurement),
+            'measurement': measurement.to_json(),
+            'configuration_id': configuration_id
         }
-        logging.debug(f'Node {self.node_id} sending measurement: {body}')
-        try:
-            response = requests.post(f'{self.base_address}/measurement/{self.node_id}', json=body)
-            response.raise_for_status()
-        except requests.exceptions.RequestException as e:
-            logging.error(f'Error sending measurement: {e}')
-            raise e
+        logging.debug(f'Sending measurement @ {dt.isoformat()}')
+        response = requests.post(f'{self.base_address}/nodes/{self.node_id}/measurement', json=body)
+        if not response.ok:
+            raise RequestException(
+                f'POST {self.base_address}/nodes/{self.node_id}/measurement returned {response.status_code}')
+
+        return self.to_knowledge_update(response)
+
+    def get_model_metadata(self, model_id: str) -> ModelMetadata:
+        logging.debug(f'Fetching model {model_id} metadata from Base Station')
+        r = requests.get(f'{self.base_address}/nodes/{self.node_id}/models/{model_id}/metadata')
+        if not r.ok:
+            raise RequestException(
+                f'GET {self.base_address}/nodes/{self.node_id}/models/{model_id}/metadata returned {r.status_code}'
+            )
+
+        metadata = ModelMetadata.from_dict(r.json())
+
+        return metadata
+
+    def fetch_model(self, model_id: str) -> bytes:
+        logging.debug(f'Fetching model {model_id} from Base Station')
+        r = requests.get(f'{self.base_address}/nodes/{self.node_id}/models/{model_id}')
+        if not r.ok:
+            raise RequestException(
+                f'GET {self.base_address}/nodes/{self.node_id}/models/{model_id} returned {r.status_code}'
+            )
+
+        return r.content
+
+    def to_knowledge_update(self, response):
+        """
+        Converts a Base Station response into a KnowledgeUpdate object.
+
+        Args:
+            response: the BaseStation response.
+
+        Returns: an instance of KnowledgeUpdate with the configuration updates provided by the BaseStation.
+        """
+        goals = self._extract_adaptation_goals(response)
+        portfolio = self._extract_models_portfolio(response)
+        return SensorKnowledgeUpdate(goals, portfolio)
+
+    @staticmethod
+    def _extract_model_metadata(response: Response) -> Optional[ModelMetadata]:
+        """
+        Maps a requests.Response object to a ModelMetadata object, if the relevant data is included in the response.
+
+        :param response: The requests.Response object, with the Base Station response.
+        :return: A ModelMetadata object if the response body includes a valid 'model_metadata' property, otherwise None.
+        """
+        body = response.json()
+        new_model_metadata = body.get('base_model_metadata')
+        if new_model_metadata is not None:
+            return ModelMetadata.from_dict(new_model_metadata)
+        else:
+            return None
+
+    @staticmethod
+    def _extract_models_portfolio(response: Response) -> Optional[list[str]]:
+        body = response.json()
+        portfolio: list = body.get('models_portfolio')
+        if portfolio is not None:
+            return portfolio
+
+        return None
+
+    @staticmethod
+    def _extract_adaptation_goals(response: Response) -> Optional[list[SensorAdaptationGoal]]:
+        body = response.json()
+        goals: list[dict] = body.get('adaptation_goals')
+        if goals is not None:
+            adaptation_goals: list[SensorAdaptationGoal] = []
+            for goal in goals:
+                adaptation_goal = SensorAdaptationGoal.from_dict(goal)
+                adaptation_goals.append(adaptation_goal)
+            return adaptation_goals
+        return None

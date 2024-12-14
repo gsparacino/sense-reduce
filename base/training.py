@@ -7,7 +7,7 @@ import tensorflow as tf
 
 from base.model import Model
 from base.window_generator import WindowGenerator
-from common import ModelMetadata
+from common.model_metadata import ModelMetadata
 
 
 class ModelDef:
@@ -164,7 +164,7 @@ def train_model(window: WindowGenerator,
                                                      patience=int(patience / 2),
                                                      mode='min',
                                                      factor=0.2,
-                                                     verbose=1,
+                                                     verbose=0,
                                                      )
     history = model.fit(window.train,
                         epochs=max_epochs,

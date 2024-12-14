@@ -1,6 +1,7 @@
 import datetime
+import logging
 import os
-from typing import List
+from typing import List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,16 +9,25 @@ import pandas as pd
 
 from .utils import full_hours_before, to_full_hour
 
+CONFIGURATION_ID_COLUMN = "configuration_id"
+EVALUATION_COLUMN = "evaluation"
+DT_COLUMN = "timestamp"
+MODEL_UUID_COLUMN = "model_uuid"
+
 
 # TODO (long-term): this class should become a layer for accessing a time-series database (e.g., InfluxDB)
 class DataStorage:
-    """A wrapper around two pandas Dataframe for past measurements and predictions."""
 
     def __init__(self, input_features: List[str], output_features: List[str]) -> None:
+        self.last_synchronization_dt: Optional[datetime.datetime] = None
+        self.next_synchronization_dt: Optional[datetime.datetime] = None
         self._measurements = pd.DataFrame(columns=input_features, dtype=np.float64)
         self._predictions = pd.DataFrame(columns=output_features, dtype=np.float64)
-        self._violations = pd.DataFrame(columns=["score"], dtype=np.float64)
-        self._horizon_updates = pd.DataFrame(columns=["model_uuid"])
+        self._violations = pd.DataFrame(columns=[MODEL_UUID_COLUMN], dtype=np.float64)
+        self._horizon_updates = pd.DataFrame(columns=[MODEL_UUID_COLUMN])
+        self._model_deployments = pd.DataFrame(columns=[DT_COLUMN, MODEL_UUID_COLUMN])
+        self._configuration_updates = pd.DataFrame(columns=[CONFIGURATION_ID_COLUMN])
+        self._analysis_performed = pd.DataFrame(columns=[DT_COLUMN, CONFIGURATION_ID_COLUMN, EVALUATION_COLUMN])
 
     @property
     def mae(self) -> pd.Series:
@@ -76,17 +86,41 @@ class DataStorage:
             return f'{prefix}_predictions.csv'
         return f'predictions.csv'
 
-    def add_violation(self, dt: datetime.datetime, score: float):
-        self._violations.loc[dt] = score
+    def add_violation(self, dt: datetime.datetime, model: str):
+        self._violations.loc[dt] = model
 
     def get_violations(self) -> pd.DataFrame:
         return self._violations
+
+    def get_violations_of_model(self, model: str) -> pd.DataFrame:
+        violations = self.get_violations()
+        return violations[violations[MODEL_UUID_COLUMN] == model]
 
     def add_horizon_update(self, dt: datetime.datetime, model: str):
         self._horizon_updates.loc[dt] = model
 
     def get_horizon_updates(self) -> pd.DataFrame:
         return self._horizon_updates
+
+    def add_configuration_update(self, dt: datetime.datetime, option_id: str):
+        self._configuration_updates.loc[dt] = option_id
+
+    def get_configuration_updates(self) -> pd.DataFrame:
+        return self._configuration_updates
+
+    def add_model_deployment(self, dt: datetime.datetime, model_id: str):
+        new_deployment = {MODEL_UUID_COLUMN: model_id, DT_COLUMN: dt}
+        idx = len(self._model_deployments)
+        self._model_deployments.loc[idx] = new_deployment
+
+    def get_model_deployments(self) -> pd.DataFrame:
+        return self._model_deployments
+
+    def add_analysis(self, dt: datetime.datetime, option_id: str, evaluation: str):
+        self._analysis_performed.loc[len(self._analysis_performed)] = [dt, option_id, evaluation]
+
+    def get_analysis(self) -> pd.DataFrame:
+        return self._analysis_performed
 
     def add_measurement(self, dt: datetime.datetime, values: np.ndarray):
         self._measurements.loc[dt] = values
@@ -103,10 +137,12 @@ class DataStorage:
             self.add_prediction(datetime.datetime.fromisoformat(date_string), values)
 
     def add_measurement_df(self, df: pd.DataFrame):
-        self._measurements = pd.concat([self._measurements, df], copy=False)
+        self._measurements = pd.concat([self._measurements, df], copy=False).groupby(level=0).last()
+        self._measurements.sort_index(inplace=True)
 
     def add_prediction_df(self, df: pd.DataFrame):
-        self._predictions = pd.concat([self._predictions, df], copy=False)
+        self._predictions = pd.concat([self._predictions, df], copy=False).groupby(level=0).last()
+        self._predictions.sort_index(inplace=True)
 
     def copy(self, deep=True) -> 'DataStorage':
         """Returns a deep copy of this object. Note that the csv_path is also equal unless changed afterwards."""
@@ -126,11 +162,20 @@ class DataStorage:
 
         If there are no measurements for a full hour, the values of the next one are used.
         """
-        hours = list(full_hours_before(dt, n_hours))  # will result in an already sorted list
-        idx = self._measurements.index.get_indexer(hours, method='nearest')
+        full_hours = list(full_hours_before(dt, n_hours))  # will result in an already sorted list
+        return self._get_nearest_measurements(full_hours)
+
+    def _get_nearest_measurements(self, dts: list[datetime.datetime]):
+        logging.debug(f"Loading measurements with timestamps [{[hour.isoformat() for hour in dts]}]")
+        idx = self._measurements.index.get_indexer(dts, method='nearest')
         result: pd.DataFrame = self._measurements.iloc[idx].copy()
-        result.set_index(pd.DatetimeIndex(hours), inplace=True)
+        result.set_index(pd.DatetimeIndex(dts), inplace=True)
+        logging.debug(f"Size of measurements: {result.size}")
         return result
+
+    def get_full_hour_measurements(self, dts: list[datetime.datetime]) -> pd.DataFrame:
+        normalized_dts = sorted(set([to_full_hour(dt) for dt in dts]))
+        return self._get_nearest_measurements(normalized_dts)
 
     def get_diff(self, columns: List[str] = None) -> pd.DataFrame:
         """Returns the difference between measurements and predictions. Removes NaNs."""

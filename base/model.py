@@ -7,9 +7,10 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-from common import full_hours_after, LiteModel, convert_datetime
+from common.lite_model import LiteModel
 from common.model_metadata import ModelMetadata
 from common.prediction_model import PredictionModel
+from common.utils import convert_datetime, full_hours_after
 
 
 class Model(PredictionModel):

@@ -1,10 +1,11 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 import numpy as np
 import pandas as pd
 
+from .data_reduction_strategy import DataReductionStrategy
 from .data_storage import DataStorage
 from .prediction_model import PredictionModel
 
@@ -47,15 +48,21 @@ class PredictionHorizon:
 class Predictor:
     """Uses a PredictionModel to provide predictions for arbitrary timestamps in the prediction range of the model."""
 
-    def __init__(self, model: PredictionModel, data: DataStorage) -> None:
+    def __init__(
+            self,
+            model: PredictionModel,
+            data: DataStorage,
+            data_reduction_strategy: DataReductionStrategy,
+    ) -> None:
         assert model.metadata.output_length <= 24  # self.get_prediction_at(dt) expects a horizon of less than a day
-        self._model = model
+        self.model = model
+        self.data_reduction_strategy = data_reduction_strategy
         self._data = data
         self._prediction_horizon: Optional[PredictionHorizon] = None
 
     @property
     def model_metadata(self):
-        return self._model.metadata
+        return self.model.metadata
 
     @property
     def data(self) -> DataStorage:
@@ -69,10 +76,10 @@ class Predictor:
     def prediction_horizon_end(self):
         return self._prediction_horizon.end
 
-    def set_model(self, other: PredictionModel, start: datetime):
+    def set_model(self, other: PredictionModel, start: datetime) -> None:
         """Changes the underlying model of the predictor and resets the prediction horizon to the specified datetime."""
-        logging.debug(f'Changing predictor model from "{self._model.metadata.uuid}" to "{other.metadata.uuid}"')
-        self._model = other
+        logging.debug(f'Changing predictor model from "{self.model.metadata.uuid}" to "{other.metadata.uuid}"')
+        self.model = other
         self._prediction_horizon = None
         self.update_prediction_horizon(start)
 
@@ -93,9 +100,33 @@ class Predictor:
         if self._prediction_horizon is None:
             return None
         else:
-            assert self.in_prediction_horizon(until)
+            # assert self.in_prediction_horizon(until)
             elapsed_hours = int((until - self.prediction_horizon_start).total_seconds() / 3600)
             return self._data.get_measurements_previous_hours(until, elapsed_hours)
+
+    def get_measurements_in_current_prediction_horizon_between_timestamps(
+            self,
+            since: datetime,
+            until: datetime
+    ) -> Optional[pd.DataFrame]:
+        """Returns the hourly measurements in the current horizon within the specified time interval (inclusive)."""
+        if self._prediction_horizon is None:
+            return None
+        else:
+            # normalized_since = max(self.prediction_horizon_start, since)
+            normalized_since = self._datetime_to_full_hour(since)
+            elapsed_hours = int((until - normalized_since).total_seconds() / 3600) + 1
+            return self._data.get_measurements_previous_hours(until, elapsed_hours)
+
+    @staticmethod
+    def _datetime_to_full_hour(dt: datetime) -> datetime:
+        if dt.minute > 0 or dt.second > 0 or dt.microsecond > 0:
+            dt = dt + timedelta(hours=1)
+        dt = dt.replace(minute=0, second=0, microsecond=0)
+        return dt
+
+    def get_measurement_at(self, dt: datetime) -> pd.Series:
+        return self._data.get_measurements().loc[dt]
 
     def get_predictions_until(self, until: datetime) -> Optional[pd.DataFrame]:
         if self._prediction_horizon is None:
@@ -112,7 +143,8 @@ class Predictor:
         return self._prediction_horizon.get_prediction_at(dt)
 
     def in_prediction_horizon(self, dt: datetime) -> bool:
-        return self._prediction_horizon.in_prediction_horizon(dt)
+        horizon = self._prediction_horizon
+        return horizon and horizon.in_prediction_horizon(dt)
 
     def adjust_to_measurement(self, dt: datetime, measurement: np.ndarray, prediction: np.ndarray) -> None:
         """Makes the predictor aware of a threshold violation so that it can adjust future predictions."""
@@ -126,6 +158,12 @@ class Predictor:
 
     def update_prediction_horizon(self, start: datetime):
         """Updates the interpolation points used for computing predictions. """
+        measurements = (
+            self.data_reduction_strategy.get_measurements_for_prediction(self.data, self.model_metadata, start)
+        )
+        self._update_prediction_horizon_with_measurements(measurements, start)
+
+    def _update_prediction_horizon_with_measurements(self, measurements: pd.DataFrame, start: datetime):
         if self._prediction_horizon is not None and \
                 self._prediction_horizon.df.index[0] <= start < self._prediction_horizon.df.index[1]:
             logging.debug(f'Skipped updating prediction horizon because nothing would change: '
@@ -133,14 +171,15 @@ class Predictor:
                           )
             return
 
-        previous_m = self._data.get_measurements_previous_hours(start, self._model.metadata.input_length)
-        new_horizon = self._model.predict(previous_m)
-
+        new_horizon = self.model.predict(measurements)
         # we also need the last measurement for interpolation
-        last_ts = previous_m.index.max()
-        new_horizon.loc[last_ts] = previous_m.loc[last_ts, self.model_metadata.output_features]
+        last_ts = measurements.index.max()
+        new_horizon.loc[last_ts] = measurements.loc[last_ts, self.model_metadata.output_features]
         new_horizon.sort_index(inplace=True)
-
         previous_ip = self._prediction_horizon
         self._prediction_horizon = PredictionHorizon(new_horizon)
+        self.data.add_prediction_df(new_horizon)
         logging.debug(f'Updated prediction horizon from\n{previous_ip}\nto\n{self._prediction_horizon}')
+
+    def get_measurements_for_prediction(self, until: datetime):
+        return self._data.get_measurements_previous_hours(until, self.model.metadata.input_length)

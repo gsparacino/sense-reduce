@@ -3,3 +3,8 @@ simulation/zamg/data
 .idea
 **/models
 *.tflite
+simulation/mapek/simulations*
+simulation/mapek/bs_models/*
+simulation/mapek/sn_models
+simulation/zamg/simulations
+**/__pycache__

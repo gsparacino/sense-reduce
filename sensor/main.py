@@ -1,16 +1,21 @@
-import datetime
 import logging
-import os
-import time
+import os.path
 import uuid
 
-import requests
+import pandas as pd
 
-from common import Predictor, ThresholdMetric, L2Threshold
-from predicting_monitor import PredictingMonitor
-from sensor.base_station_gateway import BaseStationGateway
+from common.threshold_metric import L2Threshold
+from sensor.base_station_gateway import HttpBaseStationGateway
+from sensor.multivariate_sensor_mock import MultivariateSensorMock
+from sensor.sensor_analyzer import PortfolioSensorAnalyzer
+from sensor.sensor_executor import SequentialSensorExecutor
+from sensor.sensor_knowledge import SensorKnowledge
+from sensor.sensor_manager import SensorManager
+from sensor.sensor_monitor import MultivariateSensorMonitor
+from sensor.sensor_planner import PortfolioSensorPlanner
 
 logging.basicConfig(level=logging.DEBUG)
+base_dir = os.path.abspath(os.path.dirname(__file__))
 
 
 def run(threshold_metric: ThresholdMetric,
@@ -34,72 +39,34 @@ def run(threshold_metric: ThresholdMetric,
     Raises:
         ValueError: If an invalid data reduction mode is specified.
     """
+    # TODO: use configurations
+    temp_node_id = str(uuid.uuid4())
+    input_features = ["TL", "P", "RF", "SO"]
+    output_features = ['TL']
 
-    logging.info(f'Starting sensor node with ID={NODE_ID} in "{data_reduction_mode}" mode, '
-                 f'threshold={threshold_metric} and base={base_address}...'
-                 )
-    sensor = TemperatureSensor()
-    base_station = BaseStationGateway(node_id=NODE_ID, base_address=base_address)
+    initial_df_path = os.path.join(base_dir, 'data', 'zamg_vienna_hourly.pickle')
+    vienna_df = pd.read_pickle(str(initial_df_path))
+    vienna_df = vienna_df[input_features]
+    vienna_df.index = pd.to_datetime(vienna_df.index)
+    initial_df = vienna_df[vienna_df.index.year == 2019]
 
-    if data_reduction_mode == 'none':
-        base_station.register_node(threshold_metric)
-        while True:
-            current_time = datetime.datetime.now()
-            base_station.send_measurement(current_time, sensor.measurement.values)
-            time.sleep(check_interval)
+    base_station_gateway = HttpBaseStationGateway(temp_node_id, base_address)
+    knowledge_initialization = base_station_gateway.register_node(initial_df, input_features, output_features)
 
-    elif data_reduction_mode == 'predict':
-        model, data = base_station.fetch_model_and_data(threshold_metric)
-        predictor = Predictor(model, data)
-        predictor.update_prediction_horizon(datetime.datetime.now())
-        monitor = PredictingMonitor(sensor, predictor)
-
-        monitor.monitor(
-            NODE_ID,
-            threshold_metric=threshold_metric,
-            interval_seconds=check_interval,
-            base_station_gateway=base_station
-        )
-
-    else:
-        raise ValueError(f'Unsupported data reduction mode: {data_reduction_mode}')
-
-
-def wifi_wrapper(wifi_toggle: bool, func, *args, **kwargs):
-    """
-    Wrapper function that handles toggling Wi-Fi before and after a function call.
-    If `wifi_toggle` is True, Wi-Fi is turned on before the function call and off after it.
-    The function call is executed regardless of the `wifi_toggle` setting.
-    """
-    if wifi_toggle:
-        os.system('sudo rfkill unblock wifi')
-        # wait for Wi-Fi to connect
-        base_url = kwargs.get('base', 'http://192.168.8.110:5000')
-        wait_for_wifi(base_url)
-    func(*args, **kwargs)
-    if wifi_toggle:
-        os.system('sudo rfkill block wifi')
-
-
-def wait_for_wifi(base_url: str, timeout: int = 30):
-    """
-    Waits for the Wi-Fi to connect to the base station.
-    """
-    start_time = time.monotonic()
-    while True:
-        try:
-            r = requests.get(f'{base_url}/ping')
-            if r.ok:
-                end_time = time.monotonic()
-                logging.debug(f'Connected to {base_url} in {end_time - start_time} seconds')
-                return
-        except requests.exceptions.RequestException:
-            pass
-        elapsed_time = time.monotonic() - start_time
-        if elapsed_time >= timeout:
-            logging.warning(f'Timed out waiting for Wi-Fi to connect to {base_url}')
-            return
-        time.sleep(0.5)  # wait 0.5 second before retrying
+    knowledge = SensorKnowledge.from_initialization(base_station_gateway, initial_df, knowledge_initialization)
+    # TODO: make MAPEK components configurable
+    executor = SequentialSensorExecutor
+    planner = PortfolioSensorPlanner
+    analyzer = PortfolioSensorAnalyzer
+    monitor = MultivariateSensorMonitor
+    sensor_data = vienna_df[vienna_df.index.year >= 2020]
+    sensor = MultivariateSensorMock(sensor_data)
+    model_dir = os.path.join(base_dir, 'models')
+    sensor_manager = SensorManager(
+        model_dir, input_features, output_features, sensor, initial_df, base_station_gateway,
+        monitor, analyzer, planner, executor, knowledge
+    )
+    sensor_manager.run()
 
 
 if __name__ == '__main__':
@@ -131,13 +98,13 @@ if __name__ == '__main__':
     ARGS = parser.parse_args()
 
     if ARGS.sensor == 'ds18b20':
-        from temperature_sensor_ds18b20 import TemperatureSensor
+        pass
     elif ARGS.sensor == 'sense-hat':
-        from temperature_sensor_sense_hat import TemperatureSensor
+        pass
     elif ARGS.sensor == 'dht22':
-        from temperature_sensor_dht22 import TemperatureSensor
+        pass
     elif ARGS.sensor == 'mock':
-        from temperature_sensor_mock import TemperatureSensor
+        pass
     else:
         logging.error(f'Unsupported sensor type: {ARGS.sensor}. Aborting...')
         exit(1)

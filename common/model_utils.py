@@ -7,7 +7,12 @@ from typing import Any
 import tensorflow as tf
 
 from base.model import Model
-from common import ModelMetadata, LiteModel
+from base.training import mse_weighted
+from common.lite_model import LiteModel
+from common.model_metadata import ModelMetadata
+
+if mse_weighted:
+    print('Using mse_weighted')
 
 
 def load_model_from_savemodel(path: os.path) -> Model:

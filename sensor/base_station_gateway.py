@@ -9,7 +9,7 @@ from flask import Response
 from requests import RequestException
 
 from common.model_metadata import ModelMetadata
-from common.sensor_adaptation_goal import SensorAdaptationGoal
+from common.predictor_adaptation_goal import PredictorAdaptationGoal
 from common.sensor_knowledge_update import SensorKnowledgeUpdate, SensorKnowledgeInitialization
 
 
@@ -17,7 +17,6 @@ class BaseStationGateway(ABC):
 
     @abstractmethod
     def register_node(self,
-                      initial_df: Optional[pd.DataFrame],
                       input_features: list[str],
                       output_features: list[str],
                       ) -> SensorKnowledgeInitialization:
@@ -33,11 +32,11 @@ class BaseStationGateway(ABC):
         pass
 
     @abstractmethod
-    def send_update(self,
-                    dt: datetime.datetime,
-                    data: pd.DataFrame,
-                    configuration_id: str
-                    ) -> SensorKnowledgeUpdate:
+    def send_horizon_update(self,
+                            dt: datetime.datetime,
+                            data: pd.DataFrame,
+                            configuration_id: str
+                            ) -> SensorKnowledgeUpdate:
         pass
 
     @abstractmethod
@@ -59,7 +58,7 @@ class BaseStationGateway(ABC):
         pass
 
     @abstractmethod
-    def sync(self, dt: datetime.datetime) -> SensorKnowledgeUpdate:
+    def synchronize(self, dt: datetime.datetime) -> SensorKnowledgeUpdate:
         """
         Synchronizes the sensor knowledge with the base station.
 
@@ -75,9 +74,9 @@ class BaseStationGateway(ABC):
 
 class HttpBaseStationGateway(BaseStationGateway):
 
-    def __init__(self, node_id: str, base_address: str):
-        self.node_id = node_id
+    def __init__(self, base_address: str):
         self.base_address = base_address
+        self.node_id = None
         response = requests.get(f'{self.base_address}/ping')
         if not response.ok:
             raise RequestException(
@@ -85,7 +84,6 @@ class HttpBaseStationGateway(BaseStationGateway):
             )
 
     def register_node(self,
-                      initial_df: Optional[pd.DataFrame],
                       input_features: list[str],
                       output_features: list[str],
                       ) -> SensorKnowledgeInitialization:
@@ -94,27 +92,35 @@ class HttpBaseStationGateway(BaseStationGateway):
             'output_features': output_features
         }
 
-        if initial_df is not None:
-            body['initial_df'] = initial_df.to_json()
-
         logging.debug(f'Registering node with base station at {self.base_address}')
         response = requests.post(f'{self.base_address}/nodes', json=body)
         if not response.ok:
             raise RequestException(f'POST {self.base_address}/nodes returned {response.status_code}')
         body = response.json()
-        node_id = body['node_id']
+        self.node_id = body['node_id']
+        next_sync_dt = self._extract_next_sync(response)
         adaptation_goals = self._extract_adaptation_goals(response)
         model_metadata = self._extract_model_metadata(response)
         portfolio = self._extract_models_portfolio(response)
         # TODO: add ability to receive initial data from BS
 
         return SensorKnowledgeInitialization(
-            node_id=node_id,
+            node_id=self.node_id,
             adaptation_goals=adaptation_goals,
             base_model_metadata=model_metadata,
-            models_portfolio=portfolio,
-            initial_df=initial_df
+            models_portfolio=set(portfolio),
+            next_sync_dt=next_sync_dt
         )
+
+    def synchronize(self, dt: datetime.datetime) -> SensorKnowledgeUpdate:
+        logging.debug(f'Synchronizing with Base Station')
+        response = requests.get(f'{self.base_address}/nodes/{self.node_id}/synchronize')
+        if not response.ok:
+            raise RequestException(
+                f'GET {self.base_address}/nodes/{self.node_id}/synchronize returned {response.status_code}'
+            )
+
+        return self.to_knowledge_update(response)
 
     def send_violation(self,
                        dt: datetime.datetime,
@@ -123,7 +129,7 @@ class HttpBaseStationGateway(BaseStationGateway):
                        data: pd.DataFrame) -> SensorKnowledgeUpdate:
         body = {
             'timestamp': dt.isoformat(),
-            'measurements': measurement.to_json(),
+            'measurement': measurement.to_json(),
             'configuration_id': configuration_id,
             'data': data.to_json()
         }
@@ -136,7 +142,8 @@ class HttpBaseStationGateway(BaseStationGateway):
 
         return self.to_knowledge_update(response)
 
-    def send_update(self, dt: datetime.datetime, data: pd.DataFrame, configuration_id: str) -> SensorKnowledgeUpdate:
+    def send_horizon_update(self, dt: datetime.datetime, data: pd.DataFrame,
+                            configuration_id: str) -> SensorKnowledgeUpdate:
         body = {
             'timestamp': dt.isoformat(),
             'data': data.to_json(),
@@ -190,7 +197,7 @@ class HttpBaseStationGateway(BaseStationGateway):
 
         return r.content
 
-    def to_knowledge_update(self, response):
+    def to_knowledge_update(self, response: Response):
         """
         Converts a Base Station response into a KnowledgeUpdate object.
 
@@ -201,7 +208,8 @@ class HttpBaseStationGateway(BaseStationGateway):
         """
         goals = self._extract_adaptation_goals(response)
         portfolio = self._extract_models_portfolio(response)
-        return SensorKnowledgeUpdate(goals, portfolio)
+        next_sync_dt: datetime.datetime = self._extract_next_sync(response)
+        return SensorKnowledgeUpdate(next_sync_dt, goals, portfolio)
 
     @staticmethod
     def _extract_model_metadata(response: Response) -> Optional[ModelMetadata]:
@@ -219,22 +227,31 @@ class HttpBaseStationGateway(BaseStationGateway):
             return None
 
     @staticmethod
-    def _extract_models_portfolio(response: Response) -> Optional[list[str]]:
+    def _extract_models_portfolio(response: Response) -> Optional[set[str]]:
         body = response.json()
         portfolio: list = body.get('models_portfolio')
         if portfolio is not None:
-            return portfolio
+            return set(portfolio)
 
         return None
 
     @staticmethod
-    def _extract_adaptation_goals(response: Response) -> Optional[list[SensorAdaptationGoal]]:
+    def _extract_next_sync(response: Response) -> Optional[datetime.datetime]:
         body = response.json()
-        goals: list[dict] = body.get('adaptation_goals')
+        timestamp: str = body.get('next_sync_dt')
+        if timestamp is not None:
+            return datetime.datetime.fromisoformat(timestamp)
+
+        return None
+
+    @staticmethod
+    def _extract_adaptation_goals(response: Response) -> Optional[list[PredictorAdaptationGoal]]:
+        body = response.json()
+        goals: list[dict] = body.get('predictor_adaptation_goals')
         if goals is not None:
-            adaptation_goals: list[SensorAdaptationGoal] = []
+            adaptation_goals: list[PredictorAdaptationGoal] = []
             for goal in goals:
-                adaptation_goal = SensorAdaptationGoal.from_dict(goal)
+                adaptation_goal = PredictorAdaptationGoal.from_dict(goal)
                 adaptation_goals.append(adaptation_goal)
             return adaptation_goals
         return None

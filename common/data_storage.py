@@ -92,9 +92,15 @@ class DataStorage:
     def get_violations(self) -> pd.DataFrame:
         return self._violations
 
-    def get_violations_of_model(self, model: str) -> pd.DataFrame:
-        violations = self.get_violations()
-        return violations[violations[MODEL_UUID_COLUMN] == model]
+    def get_latest_consecutive_violations_of_model(self, model: str, until: datetime.datetime) -> pd.DataFrame:
+        violations: pd.DataFrame = self.get_violations().loc[:until]
+        violations_of_prev_model: pd.DataFrame = violations[violations[MODEL_UUID_COLUMN] != model]
+        if not violations_of_prev_model.empty:
+            last_violation_of_prev_model = violations_of_prev_model.index.max()
+            start_timestamp = last_violation_of_prev_model + pd.Timedelta(seconds=1)
+            return violations.loc[start_timestamp:]
+        else:
+            return violations
 
     def add_horizon_update(self, dt: datetime.datetime, model: str):
         self._horizon_updates.loc[dt] = model
@@ -157,6 +163,13 @@ class DataStorage:
     def get_predictions(self) -> pd.DataFrame:
         return self._predictions
 
+    def get_predictions_previous_hours(self, dt: datetime.datetime, n_hours: int) -> Optional[pd.DataFrame]:
+        full_hours = list(full_hours_before(dt, n_hours))
+        return self._get_nearest_predictions(full_hours)
+
+    def get_prediction(self, dt: datetime.datetime) -> pd.Series:
+        return self._predictions.loc[dt]
+
     def get_measurements_previous_hours(self, dt: datetime.datetime, n_hours: int) -> pd.DataFrame:
         """Returns the measurements at the full hours before the specified timestamp (inclusive).
 
@@ -173,9 +186,15 @@ class DataStorage:
         logging.debug(f"Size of measurements: {result.size}")
         return result
 
-    def get_full_hour_measurements(self, dts: list[datetime.datetime]) -> pd.DataFrame:
-        normalized_dts = sorted(set([to_full_hour(dt) for dt in dts]))
-        return self._get_nearest_measurements(normalized_dts)
+    def _get_nearest_predictions(self, dts: list[datetime.datetime]) -> Optional[pd.DataFrame]:
+        if self._predictions.empty:
+            return None
+        logging.debug(f"Loading predictions with timestamps [{[hour.isoformat() for hour in dts]}]")
+        idx = self._predictions.index.get_indexer(dts, method='nearest')
+        result: pd.DataFrame = self._predictions.iloc[idx].copy()
+        result.set_index(pd.DatetimeIndex(dts), inplace=True)
+        logging.debug(f"Size of predictions: {result.size}")
+        return result
 
     def get_diff(self, columns: List[str] = None) -> pd.DataFrame:
         """Returns the difference between measurements and predictions. Removes NaNs."""

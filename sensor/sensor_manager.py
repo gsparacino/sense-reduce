@@ -6,7 +6,7 @@ import pandas as pd
 
 from common.data_reduction_strategy import DataReductionStrategy
 from sensor.abstract_sensor import AbstractSensor
-from sensor.base_station import BaseStation
+from sensor.base_station_adapter import BaseStationAdapter
 from sensor.base_station_gateway import BaseStationGateway
 from sensor.sensor_analyzer import SensorAnalyzer
 from sensor.sensor_executor import SensorExecutor
@@ -38,7 +38,7 @@ class SensorManager:
         self.output_features = output_features
         self.sensor = sensor
         self.data_reduction_strategy = data_reduction_strategy
-        self.base_station = BaseStation(base_station_gateway, data_reduction_strategy)
+        self.base_station = BaseStationAdapter(base_station_gateway, data_reduction_strategy)
         self.initial_df = initial_df
         self.knowledge = sensor_knowledge
         self.model_dir = model_dir
@@ -52,7 +52,6 @@ class SensorManager:
     def run(self) -> None:
         if self.knowledge is None:
             knowledge_initialization = self.base_station.register_node(
-                self.initial_df,
                 self.input_features,
                 self.output_features
             )
@@ -67,5 +66,5 @@ class SensorManager:
 
         logging.info(f"{datetime.datetime.now().isoformat()} - Starting Sensor {self.knowledge.node_id}")
 
-        while self.sensor.can_read_measurements():
+        while self.sensor.is_ready():
             monitor.monitor(self.sensor)

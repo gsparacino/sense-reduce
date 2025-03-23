@@ -2,24 +2,23 @@ import datetime
 import logging
 import os
 import time
-import uuid
 
 import pandas as pd
-from flask import request, g, send_file
+from flask import request, g
 
 from base import app
-from base.cluster_adaptation_goal import DeployOnceAdaptationGoal
-from base.cluster_analyzer import PortfolioClusterAnalyzer
-from base.cluster_executor import SequentialClusterExecutor
-from base.cluster_knowledge import ClusterKnowledge
-from base.cluster_manager import ClusterManager
-from base.cluster_monitor import ViolationsClusterMonitor
-from base.cluster_planner import PortfolioClusterPlanner
-from base.dense_model_trainer import DenseModelTrainer
+from base.base_station_analyzer import PredictorGoalsBaseStationAnalyzer
+from base.base_station_executor import SequentialBaseStationExecutor
+from base.base_station_knowledge import BaseStationKnowledge
+from base.base_station_manager import BaseStationManager
+from base.base_station_monitor import ViolationsBaseStationMonitor
+from base.base_station_planner import PortfolioBaseStationPlanner
 from base.learning_strategy import RetrainStrategy
 from base.model_manager import ModelManager
+from base.model_trainer import ModelTrainer
+from base.portfolio_adaptation_goal import DeployOnceAdaptationGoal
+from common.predictor_adaptation_goal import ViolationRateAdaptationGoal
 from common.resource_profiler import init_profiler, get_profiler, Profiler
-from common.sensor_adaptation_goal import TimeWindowAdaptationGoal
 
 logging.basicConfig(level=logging.DEBUG)
 base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -40,19 +39,18 @@ logging.debug(f'Loaded the training dataset from "{app.config["TRAINING_DF"]}"')
 init_profiler("logs")
 profiler: Profiler = get_profiler()
 
-# TODO: make MAPEK models configurable
-model_trainer = DenseModelTrainer()
+model_trainer = ModelTrainer()
 learning_strategy = RetrainStrategy(model_trainer, model_manager)
 cluster_goals = [DeployOnceAdaptationGoal("deploy_once")]
-node_goals = [TimeWindowAdaptationGoal("violations_goal", "TL", 1, datetime.timedelta(hours=1), 1)]
-knowledge = ClusterKnowledge(
+node_goals = [ViolationRateAdaptationGoal("violations_goal", "TL", 1, datetime.timedelta(hours=1), 1)]
+knowledge = BaseStationKnowledge(
     "base_station", model_manager, training_df, learning_strategy, cluster_goals, node_goals
 )
-executor = SequentialClusterExecutor(knowledge)
-planner = PortfolioClusterPlanner(knowledge, executor)
-analyzer = PortfolioClusterAnalyzer(knowledge, planner)
-monitor = ViolationsClusterMonitor(knowledge, analyzer)
-cluster_manager = ClusterManager("default_cluster", knowledge, monitor)
+executor = SequentialBaseStationExecutor(knowledge)
+planner = PortfolioBaseStationPlanner(knowledge, executor)
+analyzer = PredictorGoalsBaseStationAnalyzer(knowledge, planner)
+monitor = ViolationsBaseStationMonitor(knowledge, analyzer)
+cluster_manager = BaseStationManager("default_cluster", knowledge, monitor)
 
 
 @app.before_request
@@ -84,76 +82,3 @@ def after_request(response):
         )
 
     return response
-
-
-@app.post("/nodes")
-def register_node():
-    """Registers a new node and returns the initial configuration for the node."""
-    node_id = str(uuid.uuid4())
-    body = request.get_json(force=True)
-    input_features = body['input_features']
-    output_features = body['output_features']
-    initial_df_json = body.get('initial_df')
-    initial_df = pd.read_json(initial_df_json) if initial_df_json is not None else None
-    initialization = cluster_manager.register_node(input_features, output_features, initial_df)
-    logging.info(f'New node registration with ID={node_id}')
-    return initialization.to_dict()
-
-
-@app.post("/nodes/<string:node_id>/violation")
-def post_violation(node_id: str):
-    body = request.get_json(force=True)
-    dt = datetime.datetime.fromisoformat(body['timestamp'])
-    logging.info(f'Received violation message from node {node_id} @ {dt.isoformat()}')
-    # TODO: implement actual MAPEK logic on BS
-    payload = dict()
-    payload['portfolio'] = []  # TODO
-    payload['adaptation_goals'] = []  # TODO
-    return payload
-
-
-@app.post("/nodes/<string:node_id>/update")
-def post_update(node_id: str):
-    """Called when a sensor node reaches the end of its prediction horizon."""
-    body = request.get_json(force=True)
-    dt = datetime.datetime.fromisoformat(body['timestamp'])
-    logging.info(f'Received update message from node {node_id} @ {dt.isoformat()}')
-    # TODO: implement actual MAPEK logic on BS
-    payload = dict()
-    payload['portfolio'] = []  # TODO
-    payload['adaptation_goals'] = []  # TODO
-    return payload
-
-
-@app.post("/nodes/<string:node_id>/measurement")
-def post_measurement(node_id: str):
-    """Endpoint for a node to communicate a measurement."""
-    body = request.get_json(force=True)
-    dt = datetime.datetime.fromisoformat(body['timestamp'])
-    logging.info(f'Node {node_id} sent a measurement @ {dt.isoformat()}')
-    # TODO: implement actual MAPEK logic on BS
-    payload = dict()
-    payload['portfolio'] = []  # TODO
-    payload['adaptation_goals'] = []  # TODO
-    return payload
-
-
-@app.get("/nodes/<string:node_id>/models/<string:model_id>")
-def get_model(node_id: str, model_id: str):
-    logging.info(f'Node {node_id} requested model {model_id}')
-    model_file_path = model_manager.get_model_tflite_file_path(model_id)
-    return send_file(model_file_path)
-
-
-@app.get("/nodes/<string:node_id>/models/<string:model_id>/metadata")
-def get_model_metadata(node_id: str, model_id: str):
-    logging.info(f'Node {node_id} requested model metadata of {model_id}')
-    metadata = model_manager.get_model(model_id).metadata
-    return metadata.to_dict()
-
-
-@app.get("/ping")
-def ping():
-    """Simple GET endpoint for health checks."""
-    logging.info(f'GET /ping, request: {request}')
-    return "pong"

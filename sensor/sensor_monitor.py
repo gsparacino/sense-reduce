@@ -74,11 +74,13 @@ class MultivariateSensorMonitor(SensorMonitor):
 
         if not knowledge.predictor.in_prediction_horizon(dt):
             logging.info(f"{dt.isoformat()} SN Monitor: refresh prediction horizon.")
-            update = knowledge.base_station.on_horizon_update(dt, predictor)
+            update = knowledge.base_station.notify_horizon_update(dt, predictor)
             if update is not None:
                 knowledge.update(dt, update)
             self._refresh_prediction_horizon(dt, knowledge)
-        return predictor.get_prediction_at(dt)
+        prediction = predictor.get_prediction_at(dt)
+        predictor.data.add_prediction(dt, prediction.to_numpy())
+        return prediction
 
     def _refresh_prediction_horizon(self, dt: datetime.datetime, knowledge: SensorKnowledge) -> None:
         predictor = knowledge.predictor

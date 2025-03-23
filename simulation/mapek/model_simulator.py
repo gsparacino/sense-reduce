@@ -4,7 +4,8 @@ from datetime import timedelta
 import numpy as np
 import pandas as pd
 
-from common import Predictor, ThresholdMetric
+from common.predictor import Predictor
+from common.threshold_metric import ThresholdMetric
 
 PREDICTION_COLUMN = 'prediction'
 ERROR_COLUMN = 'error'

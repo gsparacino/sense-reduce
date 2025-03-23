@@ -84,16 +84,28 @@ class Predictor:
         self.update_prediction_horizon(start)
 
     def add_measurement(self, dt: datetime, values: np.ndarray):
-        self._data.add_measurement(dt, values)
+        self.data.add_measurement(dt, values)
 
     def add_measurement_df(self, df: pd.DataFrame):
-        self._data.add_measurement_df(df)
+        self.data.add_measurement_df(df)
 
     def add_prediction(self, dt: datetime, values: np.ndarray):
         self._data.add_prediction(dt, values)
 
     def add_prediction_df(self, df: pd.DataFrame):
         self._data.add_prediction_df(df)
+
+    def add_violation(self, dt: datetime):
+        self._data.add_violation(dt, self.model_metadata.uuid)
+
+    def get_violations(self) -> pd.DataFrame:
+        return self.data.get_violations()
+
+    def get_measurements(self) -> pd.DataFrame:
+        return self.data.get_measurements()
+
+    def add_configuration_update(self, dt: datetime, option_id: str) -> None:
+        self.data.add_configuration_update(dt, option_id)
 
     def get_measurements_in_current_prediction_horizon(self, until: datetime) -> Optional[pd.DataFrame]:
         """Returns the hourly measurements in the current horizon until the specified datetime (inclusive)."""
@@ -156,12 +168,12 @@ class Predictor:
         self._prediction_horizon = PredictionHorizon(self._prediction_horizon.df + diff)
         logging.debug(f'New prediction horizon: {self._prediction_horizon}')
 
-    def update_prediction_horizon(self, start: datetime):
+    def update_prediction_horizon(self, until: datetime):
         """Updates the interpolation points used for computing predictions. """
         measurements = (
-            self.data_reduction_strategy.get_measurements_for_prediction(self.data, self.model_metadata, start)
+            self.data_reduction_strategy.get_measurements_for_prediction(self.data, self.model_metadata, until)
         )
-        self._update_prediction_horizon_with_measurements(measurements, start)
+        self._update_prediction_horizon_with_measurements(measurements, until)
 
     def _update_prediction_horizon_with_measurements(self, measurements: pd.DataFrame, start: datetime):
         if self._prediction_horizon is not None and \
@@ -178,7 +190,7 @@ class Predictor:
         new_horizon.sort_index(inplace=True)
         previous_ip = self._prediction_horizon
         self._prediction_horizon = PredictionHorizon(new_horizon)
-        self.data.add_prediction_df(new_horizon)
+        # self.data.add_prediction_df(new_horizon)
         logging.debug(f'Updated prediction horizon from\n{previous_ip}\nto\n{self._prediction_horizon}')
 
     def get_measurements_for_prediction(self, until: datetime):

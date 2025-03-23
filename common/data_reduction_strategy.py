@@ -20,7 +20,7 @@ class DataReductionStrategy(ABC):
         pass
 
     @abstractmethod
-    def on_horizon_update(
+    def get_horizon_update_data(
             self,
             data: DataStorage,
             model_metadata: ModelMetadata,
@@ -29,7 +29,7 @@ class DataReductionStrategy(ABC):
         pass
 
     @abstractmethod
-    def on_violation(
+    def get_violation_data(
             self,
             data: DataStorage,
             model_metadata: ModelMetadata,
@@ -37,9 +37,13 @@ class DataReductionStrategy(ABC):
     ) -> Optional[pd.DataFrame]:
         pass
 
-    @abstractmethod
-    def synchronization_enabled(self, data: DataStorage, dt: datetime.datetime) -> bool:
-        pass
+    def get_new_measurements(self, data, dt, model_metadata):
+        since: Optional[datetime.datetime] = data.last_synchronization_dt
+        if since is None:
+            since = self._datetime_to_full_hour(dt) - datetime.timedelta(hours=model_metadata.input_length)
+        since = self._datetime_to_full_hour(since)
+        elapsed_hours = int((dt - since).total_seconds() / 3600) + 1
+        return data.get_measurements_previous_hours(dt, elapsed_hours)
 
     @staticmethod
     def _datetime_to_full_hour(dt: datetime) -> datetime:
@@ -49,7 +53,7 @@ class DataReductionStrategy(ABC):
         return dt
 
 
-class NoReductionStrategy(DataReductionStrategy):
+class DownsamplingStrategy(DataReductionStrategy):
 
     def get_measurements_for_prediction(
             self,
@@ -60,31 +64,58 @@ class NoReductionStrategy(DataReductionStrategy):
         length = model_metadata.input_length
         return data.get_measurements_previous_hours(until, length)
 
-    def on_horizon_update(
+    def get_horizon_update_data(
             self,
             data: DataStorage,
             model_metadata: ModelMetadata,
             dt: datetime.datetime
     ) -> Optional[pd.DataFrame]:
-        since: Optional[datetime.datetime] = data.last_synchronization_dt
-        if since is None:
-            since = self._datetime_to_full_hour(dt) - datetime.timedelta(hours=model_metadata.input_length)
-        since = self._datetime_to_full_hour(since)
-        elapsed_hours = int((dt - since).total_seconds() / 3600) + 1
-        return data.get_measurements_previous_hours(dt, elapsed_hours)
+        return self.get_new_measurements(data, dt, model_metadata)
 
-    def on_violation(
+    def get_violation_data(
             self,
             data: DataStorage,
             model_metadata: ModelMetadata,
             dt: datetime.datetime
     ) -> Optional[pd.DataFrame]:
-        since: Optional[datetime.datetime] = data.last_synchronization_dt
-        if since is None:
-            since = self._datetime_to_full_hour(dt) - datetime.timedelta(hours=model_metadata.input_length)
-        since = self._datetime_to_full_hour(since)
-        elapsed_hours = int((dt - since).total_seconds() / 3600) + 1
-        return data.get_measurements_previous_hours(dt, elapsed_hours)
+        return self.get_new_measurements(data, dt, model_metadata)
 
-    def synchronization_enabled(self, data: DataStorage, dt: datetime.datetime) -> bool:
-        return True
+
+class DualPredictionStrategy(DataReductionStrategy):
+
+    def get_measurements_for_prediction(
+            self,
+            data: DataStorage,
+            model_metadata: ModelMetadata,
+            until: datetime.datetime
+    ) -> pd.DataFrame:
+        length = model_metadata.input_length
+        measurements: pd.DataFrame = data.get_measurements_previous_hours(until, length)
+        predictions: pd.DataFrame = data.get_predictions_previous_hours(until, length)
+        if predictions is not None:
+            measurements.update(predictions)
+        return measurements
+
+    def get_horizon_update_data(
+            self,
+            data: DataStorage,
+            model_metadata: ModelMetadata,
+            dt: datetime.datetime
+    ) -> Optional[pd.DataFrame]:
+        measurements = self.get_new_measurements(data, dt, model_metadata)
+        columns = self.get_columns_to_transmit(model_metadata)
+        return measurements[columns]
+
+    def get_violation_data(
+            self,
+            data: DataStorage,
+            model_metadata: ModelMetadata,
+            dt: datetime.datetime
+    ) -> Optional[pd.DataFrame]:
+        measurements = self.get_new_measurements(data, dt, model_metadata)
+        columns = self.get_columns_to_transmit(model_metadata)
+        return measurements[columns]
+
+    @staticmethod
+    def get_columns_to_transmit(model_metadata: ModelMetadata) -> list[str]:
+        return [c for c in model_metadata.input_features if c not in model_metadata.output_features]

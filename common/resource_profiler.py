@@ -129,9 +129,8 @@ class Profiler:
 _profiler: Optional[Profiler] = None
 
 
-def init_profiler(log_dir: os.path) -> None:
-    global _profiler
-    _profiler = Profiler(log_dir)
+def init_profiler(log_dir: os.path) -> Profiler:
+    return Profiler(log_dir)
 
 
 def get_profiler() -> Optional[Profiler]:

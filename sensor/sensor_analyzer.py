@@ -42,35 +42,36 @@ class PortfolioSensorAnalyzer(SensorAnalyzer):
         adaptation_goals = knowledge.adaptation_goals
 
         if knowledge.pending_adaptation:
+            logging.info(f"{dt.isoformat()} SN Analyzer: adaptation pending. Skipping analysis.")
             return
-        knowledge.pending_adaptation = True
 
         # Assess adaptation goals
         if any(goal.requires_adaptation(current_predictor, dt) for goal in adaptation_goals):
+            knowledge.pending_adaptation = True
+
+            logging.info(f"{dt.isoformat()} SN Analyzer: evaluating models in portfolio.")
             analysis_results: list[PredictorAnalysisResult] = self._execute_analysis(dt)
 
             # Is there at least one suitable model?
             if len(analysis_results) > 0:
-                logging.info(f"{dt.isoformat()} SN Analyzer: adaptation required.")
                 self.planner.plan(dt, analysis_results)
-                knowledge.pending_adaptation = False
-                return
-            elif knowledge.synchronization_enabled(dt):
-                logging.info(f"{dt.isoformat()} SN Analyzer: synchronization enabled, will send notification to BS.")
-                new_models_results = self._update_portfolio_and_evaluate_new_models(dt)
-                if len(new_models_results) > 0:
-                    self.planner.plan(dt, new_models_results)
-                    knowledge.pending_adaptation = False
-                    return
+            else:
+                self.planner.fail_safe_plan(dt)
 
-        logging.info(f"{dt.isoformat()} SN Analyzer: use fail-safe strategy.")
-        self.planner.fail_safe_plan(dt)
-        knowledge.pending_adaptation = False
+            knowledge.pending_adaptation = False
+        else:
+            logging.info(f"{dt.isoformat()} SN Analyzer: no adaptation required.")
+            knowledge.update_prediction_horizon(dt)
+            knowledge.adjust_predictions(
+                dt,
+                knowledge.predictor.get_measurement_at(dt),
+                knowledge.predictor.get_prediction_at(dt)
+            )
 
     def _update_portfolio_and_evaluate_new_models(self, dt: datetime.datetime) -> list[PredictorAnalysisResult]:
         knowledge = self.knowledge
         current_predictor = knowledge.predictor
-        model_manager = knowledge.model_manager
+        model_manager = knowledge.model_portfolio
 
         results: list[PredictorAnalysisResult] = []
 
@@ -88,7 +89,7 @@ class PortfolioSensorAnalyzer(SensorAnalyzer):
 
     def _execute_analysis(self, dt: datetime.datetime) -> list[PredictorAnalysisResult]:
         current_predictor = self.knowledge.predictor
-        models = self.knowledge.model_manager.get_models()
+        models = self.knowledge.model_portfolio.get_models()
         data = current_predictor.data
 
         return self._evaluate_models(current_predictor, data, dt, models)
@@ -132,9 +133,10 @@ class PortfolioSensorAnalyzer(SensorAnalyzer):
         evaluation = {}  # Create a dict with every goal's score for the current configuration
 
         for goal in adaptation_goals:
-            score = goal.evaluate(new_predictor, data_reduction_strategy, dt)
+            score = goal.evaluate(new_predictor, dt)
             if score > 0:
                 evaluation[goal.goal_id] = score
         configuration = PredictorConfiguration(model_id, new_predictor)
-
-        return PredictorAnalysisResult(configuration, pd.Series(dtype=float64, data=evaluation))
+        evaluation_series = pd.Series(dtype=float64, data=evaluation)
+        logging.info(f"SN Analyzer: Model {model.metadata.uuid} score: {evaluation_series.sum()}")
+        return PredictorAnalysisResult(configuration, evaluation_series)

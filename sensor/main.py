@@ -6,7 +6,7 @@ import pandas as pd
 
 from common.threshold_metric import L2Threshold
 from sensor.base_station_gateway import HttpBaseStationGateway
-from sensor.multivariate_sensor_mock import MultivariateSensorMock
+from sensor.multivariate_sensor_mock import SimulationSensor
 from sensor.sensor_analyzer import PortfolioSensorAnalyzer
 from sensor.sensor_executor import SequentialSensorExecutor
 from sensor.sensor_knowledge import SensorKnowledge
@@ -60,7 +60,7 @@ def run(threshold_metric: ThresholdMetric,
     analyzer = PortfolioSensorAnalyzer
     monitor = MultivariateSensorMonitor
     sensor_data = vienna_df[vienna_df.index.year >= 2020]
-    sensor = MultivariateSensorMock(sensor_data)
+    sensor = SimulationSensor(sensor_data)
     model_dir = os.path.join(base_dir, 'models')
     sensor_manager = SensorManager(
         model_dir, input_features, output_features, sensor, initial_df, base_station_gateway,

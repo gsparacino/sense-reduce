@@ -12,5 +12,5 @@ class AbstractSensor(ABC):
         pass
 
     @abstractmethod
-    def can_read_measurements(self) -> bool:
+    def is_ready(self) -> bool:
         pass

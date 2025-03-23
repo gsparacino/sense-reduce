@@ -49,7 +49,7 @@ class PredictingMonitor:
                 # TODO: keep track of last synchronization and only send required data
                 new_data = p.get_measurements_in_current_prediction_horizon(now)
                 p.update_prediction_horizon(now)
-                new_predictor = base_station_gateway.send_update(node_id, now, new_data, p)
+                new_predictor = base_station_gateway.send_horizon_update(node_id, now, new_data, p)
                 if new_predictor is not None:
                     self.predictor = new_predictor
                 prediction = p.get_prediction_at(now)

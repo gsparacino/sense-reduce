@@ -5,7 +5,7 @@ from common.data_reduction_strategy import DataReductionStrategy
 from common.data_storage import DataStorage
 from common.prediction_model import PredictionModel
 from common.predictor import Predictor
-from common.sensor_adaptation_goal import SensorAdaptationGoal
+from common.predictor_adaptation_goal import PredictorAdaptationGoal
 from common.sensor_knowledge_update import SensorKnowledgeUpdate
 
 
@@ -21,16 +21,17 @@ class NodeManager:
         self.node_id = node_id
         self.enabled = False
         self.last_adaptation_dt: Optional[datetime.datetime] = None
-        self.next_adaptation_dt: Optional[datetime.datetime] = None
-        self.data = DataStorage(input_features, output_features)
-        self.predictor: Predictor = Predictor(model, self.data, data_reduction_strategy)
-        self._adaptation_goals: dict[str, SensorAdaptationGoal] = {}
+        self.next_sync_dt: Optional[datetime.datetime] = None
+        self.predictor: Predictor = (
+            Predictor(model, DataStorage(input_features, output_features), data_reduction_strategy)
+        )
+        self._adaptation_goals: dict[str, PredictorAdaptationGoal] = {}
         self._models: set[str] = set()
 
-    def get_adaptation_goals(self) -> list[SensorAdaptationGoal]:
+    def get_adaptation_goals(self) -> list[PredictorAdaptationGoal]:
         return list(self._adaptation_goals.values())
 
-    def add_adaptation_goal(self, adaptation_goal: SensorAdaptationGoal) -> None:
+    def add_adaptation_goal(self, adaptation_goal: PredictorAdaptationGoal) -> None:
         self._adaptation_goals[adaptation_goal.goal_id] = adaptation_goal
 
     def remove_adaptation_goal(self, goal_id: str) -> None:
@@ -57,7 +58,7 @@ class NodeManager:
 
     def to_sensor_knowledge_update(self) -> SensorKnowledgeUpdate:
         return SensorKnowledgeUpdate(
-            self.next_adaptation_dt,
+            self.next_sync_dt,
             self.get_adaptation_goals(),
             self.get_model_ids()
         )

@@ -194,20 +194,28 @@ def save_results(
     with open(results_file_path, "w") as fp:
         json.dump(results, fp)
 
-    years = list(measurements.index.year.unique())
     last_config = configuration_updates.loc[configuration_updates.index.min()]
-    for year in years:
-        configs = configuration_updates[configuration_updates.index.year == year]
+    min_date = measurements.index.min()
+    max_date = measurements.index.max()
+    window_size = pd.DateOffset(months=3)
+
+    start_date: pd.Timestamp = min_date
+
+    while start_date <= max_date:
+        end_date = start_date + window_size
+        configs = configuration_updates.loc[start_date:end_date]
+        sim_id = f"{start_date.year}_{start_date.month:02d}_{start_date.day:02d}"
 
         plot_simulation(
-            sim_dir, year,
-            predictions[predictions.index.year == year],
-            measurements[measurements.index.year == year],
-            violations[violations.index.year == year],
-            horizon_updates[horizon_updates.index.year == year],
+            sim_dir, sim_id,
+            predictions[start_date:end_date],
+            measurements[start_date:end_date],
+            violations[start_date:end_date],
+            horizon_updates[start_date:end_date],
             configs,
             last_config,
             threshold
         )
         if len(configs) > 0:
             last_config = configs.iloc[-1]
+        start_date += window_size
